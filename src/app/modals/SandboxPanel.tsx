@@ -3,8 +3,9 @@ import { useGameStore } from '../store/useGameStore';
 import { sandboxManager, CombatLogEntry } from '../../features/sandbox/sandboxManager';
 import { ALL_SKILLS_36 } from '../../features/skills/skillData';
 import { ITEM_REGISTRY } from '../../features/items/itemRegistry';
-import { X, Wrench, Shield, Zap, Sparkles, Coins, MapPin, Eye, Activity } from 'lucide-react';
+import { X, Wrench, Shield, Zap, Sparkles, Coins, MapPin, Eye, Activity, Egg, Heart } from 'lucide-react';
 import { soundManager } from '../../shared/utils/soundSynthesizer';
+import { getAllPetSpecies } from '../../features/pets/petRegistry';
 
 export const SandboxPanel: React.FC = () => {
   const { 
@@ -14,10 +15,16 @@ export const SandboxPanel: React.FC = () => {
     showNotification,
     setPlayerStats,
     stats,
-    specialization
+    specialization,
+    pets,
+    petEggs,
+    activePetId,
+    setActivePet,
+    addEgg,
+    hatchEggAtSlot
   } = useGameStore();
 
-  const [activeTab, setActiveTab] = useState<'character' | 'skills' | 'items' | 'world' | 'combat'>('character');
+  const [activeTab, setActiveTab] = useState<'character' | 'skills' | 'items' | 'world' | 'combat' | 'pets'>('character');
   const [godMode, setGodMode] = useState(sandboxManager.getConfig().godMode);
   const [infiniteMana, setInfiniteMana] = useState(sandboxManager.getConfig().infiniteMana);
   const [infiniteStamina, setInfiniteStamina] = useState(sandboxManager.getConfig().infiniteStamina);
@@ -109,7 +116,7 @@ export const SandboxPanel: React.FC = () => {
         </div>
 
         {/* Tab Selectors */}
-        <div className="grid grid-cols-5 bg-fantasy-panel/60 border-b border-fantasy-border text-xs font-bold">
+        <div className="grid grid-cols-6 bg-fantasy-panel/60 border-b border-fantasy-border text-xs font-bold">
           <button
             onClick={() => setActiveTab('character')}
             className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-all ${
@@ -133,6 +140,14 @@ export const SandboxPanel: React.FC = () => {
             }`}
           >
             <Coins size={14} /> Items
+          </button>
+          <button
+            onClick={() => setActiveTab('pets')}
+            className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-all ${
+              activeTab === 'pets' ? 'border-amber-400 text-amber-300 bg-amber-950/20' : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Heart size={14} /> Pets
           </button>
           <button
             onClick={() => setActiveTab('world')}
@@ -358,6 +373,176 @@ export const SandboxPanel: React.FC = () => {
                   <span>{disableAI ? 'FROZEN' : 'ACTIVE'}</span>
                 </button>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'pets' && (
+            <div className="flex flex-col gap-4 text-xs">
+              {/* Egg Spawning Cheats */}
+              <div>
+                <div className="font-bold text-slate-300 mb-2 flex items-center justify-between">
+                  <span>Spawn Pet Eggs:</span>
+                  <span className="text-slate-500 font-mono">Current Eggs: {petEggs.length}</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <button
+                    onClick={() => {
+                      addEgg('common');
+                      soundManager.playSfx('pickup');
+                    }}
+                    className="p-2.5 rounded-xl border border-emerald-600/50 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 font-bold flex items-center gap-2"
+                  >
+                    <span>🥚 Common Egg</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      addEgg('uncommon');
+                      soundManager.playSfx('pickup');
+                    }}
+                    className="p-2.5 rounded-xl border border-orange-600/50 bg-orange-950/30 hover:bg-orange-900/40 text-orange-300 font-bold flex items-center gap-2"
+                  >
+                    <span>🥚 Uncommon Egg</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      addEgg('rare');
+                      soundManager.playSfx('pickup');
+                    }}
+                    className="p-2.5 rounded-xl border border-purple-600/50 bg-purple-950/30 hover:bg-purple-900/40 text-purple-300 font-bold flex items-center gap-2"
+                  >
+                    <span>🥚 Rare Egg</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      addEgg('epic');
+                      soundManager.playSfx('pickup');
+                    }}
+                    className="p-2.5 rounded-xl border border-sky-600/50 bg-sky-950/30 hover:bg-sky-900/40 text-sky-300 font-bold flex items-center gap-2"
+                  >
+                    <span>🥚 Epic Egg</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      addEgg('legendary', 'baby_dragon');
+                      soundManager.playSfx('pickup');
+                    }}
+                    className="p-2.5 rounded-xl border border-amber-500/70 bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 font-bold flex items-center gap-2 col-span-2 sm:col-span-1 shadow"
+                  >
+                    <span>🐲 Legendary Dragon Egg</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Roster & Quick Hatch Controls */}
+              <div>
+                <div className="font-bold text-slate-300 mb-2">Pet Roster Automation:</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      const allSpecies = getAllPetSpecies();
+                      allSpecies.forEach((sp) => {
+                        const exists = pets.some((p) => p.speciesId === sp.id);
+                        if (!exists) {
+                          useGameStore.getState().addPet(sp.id);
+                        }
+                      });
+                      soundManager.playSfx('levelup');
+                      showNotification('SANDBOX', 'All 8 Pet Species Unlocked!', 'success');
+                    }}
+                    className="p-2.5 rounded-xl border border-amber-500/70 bg-gradient-to-r from-amber-600/30 to-yellow-600/30 hover:from-amber-600/40 hover:to-yellow-600/40 text-amber-200 font-bold flex items-center justify-center gap-2"
+                  >
+                    <Sparkles size={14} /> Unlock All 8 Species
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (petEggs.length === 0) {
+                        showNotification('SANDBOX', 'No eggs to hatch!', 'warning');
+                        return;
+                      }
+                      const eggsToHatch = [...petEggs];
+                      eggsToHatch.forEach((e) => hatchEggAtSlot(e.id));
+                      soundManager.playSfx('victory');
+                      showNotification('SANDBOX', `Instantly hatched ${eggsToHatch.length} eggs!`, 'success');
+                    }}
+                    className="p-2.5 rounded-xl border border-emerald-500/60 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-200 font-bold flex items-center justify-center gap-2"
+                  >
+                    <Egg size={14} /> Instant Hatch All Eggs
+                  </button>
+                </div>
+              </div>
+
+              {/* Active Companion Fast Actions */}
+              <div>
+                <div className="font-bold text-slate-300 mb-2">Fast Summon Companion:</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => {
+                      let dragon = pets.find((p) => p.speciesId === 'baby_dragon');
+                      if (!dragon) {
+                        dragon = useGameStore.getState().addPet('baby_dragon');
+                      }
+                      setActivePet(dragon.id);
+                      soundManager.playSfx('crystal');
+                      showNotification('SANDBOX', 'Summoned Baby Dragon companion!', 'info');
+                    }}
+                    className="p-2 rounded-xl bg-pink-950/40 border border-pink-500/50 hover:bg-pink-900/50 text-pink-300 font-bold"
+                  >
+                    🐲 Baby Dragon
+                  </button>
+                  <button
+                    onClick={() => {
+                      let fox = pets.find((p) => p.speciesId === 'ember_fox');
+                      if (!fox) {
+                        fox = useGameStore.getState().addPet('ember_fox');
+                      }
+                      setActivePet(fox.id);
+                      soundManager.playSfx('crystal');
+                      showNotification('SANDBOX', 'Summoned Ember Fox companion!', 'info');
+                    }}
+                    className="p-2 rounded-xl bg-orange-950/40 border border-orange-500/50 hover:bg-orange-900/50 text-orange-300 font-bold"
+                  >
+                    🦊 Ember Fox
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActivePet(null);
+                      soundManager.playSfx('click');
+                      showNotification('SANDBOX', 'Dismissed active pet.', 'info');
+                    }}
+                    className="p-2 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-bold"
+                  >
+                    ✕ Dismiss Active
+                  </button>
+                </div>
+              </div>
+
+              {/* Level Up Active Pet */}
+              {activePetId && (
+                <div>
+                  <div className="font-bold text-slate-300 mb-2">Active Pet Level Testing:</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        useGameStore.getState().feedPet(activePetId, 500);
+                        soundManager.playSfx('levelup');
+                      }}
+                      className="p-2 rounded-xl bg-purple-950/40 border border-purple-500/50 hover:bg-purple-900/50 text-purple-300 font-bold"
+                    >
+                      +500 EXP (Level Boost)
+                    </button>
+                    <button
+                      onClick={() => {
+                        useGameStore.getState().feedPet(activePetId, 10000);
+                        soundManager.playSfx('victory');
+                      }}
+                      className="p-2 rounded-xl bg-amber-950/40 border border-amber-500/50 hover:bg-amber-900/50 text-amber-300 font-bold"
+                    >
+                      MAX LEVEL (Lv. 25)
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

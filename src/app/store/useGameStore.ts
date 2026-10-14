@@ -5,6 +5,10 @@ import {
   QuestState, 
   Specialization, 
   GameSettings,
+  PetInstance,
+  PetEggInstance,
+  PetSpeciesId,
+  PetRarity
 } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../persistence/database';
 import { saveService } from '../../persistence/saveService';
@@ -13,6 +17,9 @@ import { getItemDefinition } from '../../features/items/itemRegistry';
 import { getQuestDefinition } from '../../features/quests/questRegistry';
 import { CRAFTING_RECIPES } from '../../features/crafting/craftingRegistry';
 import { soundManager } from '../../shared/utils/soundSynthesizer';
+import { createPetInstance, calculateRequiredPetExp } from '../../features/pets/petRegistry';
+import { EggDropManager } from '../../features/pets/eggDropManager';
+import { skillCastingEngine } from '../../features/combat/SkillCastingEngine';
 
 export type ActiveModal = 
   | 'none' 
@@ -26,7 +33,9 @@ export type ActiveModal =
   | 'gameover' 
   | 'pause'
   | 'sandbox'
-  | 'map';
+  | 'map'
+  | 'pets'
+  | 'hatchery';
 
 export interface NotificationToast {
   id: string;
@@ -59,6 +68,9 @@ interface GameState {
   quests: QuestState[];
   skills: { id: string; currentRank: number }[];
   settings: GameSettings;
+  pets: PetInstance[];
+  petEggs: PetEggInstance[];
+  activePetId: string | null;
 
   // Actions
   openModal: (modal: ActiveModal) => void;
@@ -72,7 +84,14 @@ interface GameState {
   setKaelPortrait: (url: string) => void;
   setHotbarSkill: (slotIndex: number, skillId: string) => void;
 
-  setPlayerStats: (stats: CharacterStats) => void;
+  addPet: (speciesId: PetSpeciesId, nickname?: string) => PetInstance;
+  setActivePet: (petId: string | null) => void;
+  addEgg: (rarity: PetRarity, speciesId?: PetSpeciesId) => void;
+  hatchEggAtSlot: (eggId: string) => PetInstance | null;
+  feedPet: (petId: string, expAmount: number) => boolean;
+  renamePet: (petId: string, newName: string) => void;
+
+  setPlayerStats: (stats: Partial<CharacterStats>) => void;
   setQuests: (quests: QuestState[]) => void;
   updateExpAndGold: (expDelta: number, goldDelta: number, echoShardDelta?: number) => void;
   equipItem: (instanceId: string) => void;
@@ -157,9 +176,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   ],
 
   settings: DEFAULT_SETTINGS,
+  pets: [],
+  petEggs: [
+    EggDropManager.createEggInstance('common', 'forest_slime'),
+  ],
+  activePetId: null,
 
   openModal: (modal) => {
     soundManager.playSfx('click');
+    skillCastingEngine.cancelCurrentCast('Menu opened');
     set({ activeModal: modal });
   },
 
@@ -169,12 +194,89 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   setDialogue: (dialogue) => {
+    if (dialogue) {
+      skillCastingEngine.cancelCurrentCast('Dialogue opened');
+    }
     set({ currentDialogue: dialogue });
   },
 
   closeDialogue: () => {
     soundManager.playSfx('click');
     set({ currentDialogue: null });
+  },
+
+  addPet: (speciesId, nickname) => {
+    const newPet = createPetInstance(speciesId, nickname);
+    set((state) => ({
+      pets: [...state.pets, newPet],
+      activePetId: state.activePetId ? state.activePetId : newPet.id,
+    }));
+    return newPet;
+  },
+
+  setActivePet: (petId) => {
+    soundManager.playSfx('click');
+    set((state) => ({
+      pets: state.pets.map((p) => ({ ...p, isActive: p.id === petId })),
+      activePetId: petId,
+    }));
+  },
+
+  addEgg: (rarity, speciesId) => {
+    const egg = EggDropManager.createEggInstance(rarity, speciesId);
+    set((state) => ({
+      petEggs: [...state.petEggs, egg],
+    }));
+    get().showNotification('PET EGG DISCOVERED!', `Found a ${rarity.toUpperCase()} pet egg!`, 'loot');
+  },
+
+  hatchEggAtSlot: (eggId) => {
+    const egg = get().petEggs.find((e) => e.id === eggId);
+    if (!egg) return null;
+
+    const speciesId = EggDropManager.hatchEgg(egg);
+    const newPet = createPetInstance(speciesId);
+
+    set((state) => ({
+      petEggs: state.petEggs.filter((e) => e.id !== eggId),
+      pets: [...state.pets, newPet],
+      activePetId: state.activePetId ? state.activePetId : newPet.id,
+    }));
+
+    soundManager.playSfx('victory');
+    return newPet;
+  },
+
+  feedPet: (petId, expAmount) => {
+    const pet = get().pets.find((p) => p.id === petId);
+    if (!pet) return false;
+
+    let newExp = pet.exp + expAmount;
+    let newLevel = pet.level;
+    let newMaxExp = pet.maxExp;
+
+    while (newExp >= newMaxExp) {
+      newExp -= newMaxExp;
+      newLevel += 1;
+      newMaxExp = calculateRequiredPetExp(newLevel);
+    }
+
+    set((state) => ({
+      pets: state.pets.map((p) =>
+        p.id === petId
+          ? { ...p, level: newLevel, exp: newExp, maxExp: newMaxExp }
+          : p
+      ),
+    }));
+
+    soundManager.playSfx('pickup');
+    return true;
+  },
+
+  renamePet: (petId, newName) => {
+    set((state) => ({
+      pets: state.pets.map((p) => (p.id === petId ? { ...p, nickname: newName } : p)),
+    }));
   },
 
   showNotification: (title, message, type = 'info') => {
@@ -219,7 +321,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   setPlayerStats: (stats) => {
-    set({ stats });
+    set((state) => ({ stats: { ...state.stats, ...stats } }));
   },
 
   setQuests: (quests) => {

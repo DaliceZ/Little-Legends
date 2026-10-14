@@ -79,7 +79,7 @@ export type Specialization =
   | 'shadow_assassin' 
   | 'echo_mage';
 
-export type ElementType = 'physical' | 'fire' | 'ice' | 'lightning' | 'wind' | 'shadow' | 'crystal';
+export type ElementType = 'physical' | 'fire' | 'ice' | 'lightning' | 'wind' | 'shadow' | 'crystal' | 'earth';
 
 export interface SkillNode {
   id: string;
@@ -141,6 +141,11 @@ export interface QuestDefinition {
   objectives: QuestObjective[];
   rewards: QuestReward;
   isRepeatable?: boolean;
+  targetLocationEn?: string;
+  targetLocationTh?: string;
+  suggestedActionEn?: string;
+  suggestedActionTh?: string;
+  worldCoordinates?: { x: number; y: number; zone: 'village' | 'forest' | 'dungeon' };
 }
 
 export interface QuestState {
@@ -237,4 +242,65 @@ export interface Achievement {
   target: number;
   unlocked: boolean;
   unlockedAt?: string;
+}
+
+export type PetSpeciesId = 
+  | 'forest_slime'
+  | 'ember_fox'
+  | 'frost_bunny'
+  | 'thunder_cub'
+  | 'shadow_cat'
+  | 'crystal_sprite'
+  | 'moss_turtle'
+  | 'baby_dragon';
+
+export type PetRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export interface PetSpeciesDefinition {
+  id: PetSpeciesId;
+  nameEn: string;
+  nameTh: string;
+  species: string;
+  descriptionEn: string;
+  descriptionTh: string;
+  rarity: PetRarity;
+  element: ElementType;
+  role: 'healer' | 'fire_dps' | 'ice_control' | 'shock_buffer' | 'crit_stealth' | 'mana_battery' | 'tank_shield' | 'legendary_breaker';
+  baseStats: {
+    hp: number;
+    atk: number;
+    def: number;
+    supportPower: number;
+  };
+  growthPerLevel: {
+    hp: number;
+    atk: number;
+    def: number;
+    supportPower: number;
+  };
+  abilityNameEn: string;
+  abilityNameTh: string;
+  abilityDescEn: string;
+  abilityDescTh: string;
+  abilityCooldownMs: number;
+  spriteColor: number;
+  accentColor: string;
+}
+
+export interface PetInstance {
+  id: string;
+  speciesId: PetSpeciesId;
+  nickname: string;
+  level: number;
+  exp: number;
+  maxExp: number;
+  isActive: boolean;
+  unlockedAt: number;
+}
+
+export interface PetEggInstance {
+  id: string;
+  rarity: PetRarity;
+  speciesId?: PetSpeciesId;
+  acquiredAt: number;
 }

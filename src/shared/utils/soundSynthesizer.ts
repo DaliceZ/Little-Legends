@@ -34,7 +34,7 @@ class SoundSynthesizer {
   }
 
   // Play standard retro sound effects
-  playSfx(type: 'slash' | 'hit' | 'dodge' | 'pickup' | 'levelup' | 'quest' | 'click' | 'potion' | 'boss_roar' | 'crystal' | 'fire' | 'ice' | 'shadow' | 'lightning' | 'earth' | 'ultimate') {
+  playSfx(type: 'slash' | 'hit' | 'dodge' | 'pickup' | 'levelup' | 'quest' | 'click' | 'potion' | 'boss_roar' | 'crystal' | 'fire' | 'ice' | 'shadow' | 'lightning' | 'earth' | 'ultimate' | 'victory' | 'wind') {
     if (this.isMuted || this.masterVol <= 0 || this.sfxVol <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
@@ -291,6 +291,40 @@ class SoundSynthesizer {
           osc.start(startTime);
           osc.stop(startTime + 0.75);
         });
+        break;
+      }
+      case 'victory': {
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx!.createOscillator();
+          const noteGain = this.ctx!.createGain();
+          const startTime = now + idx * 0.08;
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, startTime);
+          noteGain.gain.setValueAtTime(netVolume, startTime);
+          noteGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+          osc.connect(noteGain);
+          noteGain.connect(gainNode);
+          osc.start(startTime);
+          osc.stop(startTime + 0.4);
+        });
+        break;
+      }
+      case 'wind': {
+        const osc = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(440, now + 0.1);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.22);
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(700, now);
+        gainNode.gain.setValueAtTime(netVolume * 0.7, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(filter);
+        filter.connect(gainNode);
+        osc.start(now);
+        osc.stop(now + 0.22);
         break;
       }
     }

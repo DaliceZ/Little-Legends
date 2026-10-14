@@ -5,9 +5,10 @@ import { soundManager } from '../../shared/utils/soundSynthesizer';
 import { QuestManager } from '../../features/quests/questManager';
 import { LightingManager } from '../rendering/LightingManager';
 import { WeatherManager } from '../rendering/WeatherManager';
-import { VFXManager } from '../rendering/VFXManager';
-import { ALL_SKILLS_36 } from '../../features/skills/skillData';
 import { sandboxManager } from '../../features/sandbox/sandboxManager';
+import { skillCastingEngine, EnemyTarget } from '../../features/combat/SkillCastingEngine';
+import { PetCompanion } from '../entities/PetCompanion';
+import { EggDropManager } from '../../features/pets/eggDropManager';
 
 interface EnemyInstance {
   sprite: Phaser.Physics.Arcade.Sprite;
@@ -51,7 +52,8 @@ export class WorldScene extends Phaser.Scene {
   private lastAttackTime: number = 0;
   private staminaRegenTimer: number = 0;
   private numKeys: { [key: number]: Phaser.Input.Keyboard.Key } = {};
-  private skillCooldowns: Map<string, number> = new Map();
+  private petCompanion: PetCompanion | null = null;
+  private currentActivePetId: string | null = null;
 
   constructor() {
     super({ key: 'WorldScene' });
@@ -322,6 +324,22 @@ export class WorldScene extends Phaser.Scene {
     // Handle Enemy AI & Behaviors
     this.updateEnemies(time, delta);
 
+    // Sync and Update Pet Companion
+    this.syncPetCompanion();
+    if (this.petCompanion) {
+      this.petCompanion.update(time, delta, this.enemies.map(e => ({
+        x: e.sprite.x,
+        y: e.sprite.y,
+        hp: e.hp,
+        isDead: e.hp <= 0 || !e.sprite.active,
+        takeDamage: (amount, isCrit, _elem) => {
+          e.hp -= amount;
+          this.showFloatingDamage(e.sprite.x, e.sprite.y - 18, amount, isCrit, '#fbbf24');
+          if (e.hp <= 0) this.killEnemy(e);
+        }
+      })));
+    }
+
     // Dynamic Lighting & Atmospheric Weather
     if (this.lightingManager) this.lightingManager.update(time, delta);
     if (this.weatherManager) this.weatherManager.update(time, delta);
@@ -348,7 +366,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private handlePlayerInput(_time: number, delta: number) {
-    if (this.isAttacking || this.isDodging) return;
+    if (this.isAttacking || this.isDodging || skillCastingEngine.getState() !== 'IDLE') return;
 
     let vx = 0;
     let vy = 0;
@@ -557,6 +575,17 @@ export class WorldScene extends Phaser.Scene {
     const goldGain = enemy.type === 'slime' ? 6 : enemy.type === 'bat' ? 8 : 15;
     useGameStore.getState().updateExpAndGold(expGain, goldGain);
 
+    // Pet Companion EXP
+    if (this.petCompanion) {
+      this.petCompanion.gainExp(Math.round(expGain * 0.8));
+    }
+
+    // Roll Pet Egg Drop
+    const eggDrop = EggDropManager.rollEggDrop(false);
+    if (eggDrop) {
+      useGameStore.getState().addEgg(eggDrop.rarity, eggDrop.speciesId);
+    }
+
     // Loot drop chances
     if (enemy.type === 'slime') {
       useGameStore.getState().addItemToInventory('item_slime_gel', 1);
@@ -638,157 +667,59 @@ export class WorldScene extends Phaser.Scene {
     this.performSkillById(skillId);
   }
 
-  private performSkillById(skillId: string) {
-    const gameStore = useGameStore.getState();
-    const skill = ALL_SKILLS_36[skillId];
-    if (!skill) return;
-
-    const now = this.time.now;
-    const sandboxCfg = sandboxManager.getConfig();
-
-    // Cooldown check (bypass if zeroCooldowns is active)
-    const readyAt = this.skillCooldowns.get(skillId) || 0;
-    if (!sandboxCfg.zeroCooldowns && now < readyAt) {
-      return;
-    }
-
-    // Resource check
-    if (!sandboxCfg.infiniteStamina && (skill.costSp || 0) > gameStore.stats.sp) {
-      gameStore.showNotification('LOW STAMINA', 'Not enough stamina!', 'warning');
-      return;
-    }
-    if (!sandboxCfg.infiniteMana && (skill.costMp || 0) > gameStore.stats.mp) {
-      gameStore.showNotification('LOW MANA', 'Not enough mana!', 'warning');
-      return;
-    }
-
-    // Deduct costs
-    if (!sandboxCfg.infiniteStamina && skill.costSp) {
-      gameStore.setPlayerStats({
-        ...gameStore.stats,
-        sp: Math.max(0, gameStore.stats.sp - skill.costSp),
-      });
-    }
-    if (!sandboxCfg.infiniteMana && skill.costMp) {
-      gameStore.setPlayerStats({
-        ...gameStore.stats,
-        mp: Math.max(0, gameStore.stats.mp - skill.costMp),
-      });
-    }
-
-    this.skillCooldowns.set(skillId, now + skill.cooldownMs);
-
-    // Direction offsets
-    let targetX = this.player.x;
-    let targetY = this.player.y;
-    let angle = 0;
-
-    if (this.currentDirection === 'right') {
-      targetX += 36;
-      angle = 0;
-    } else if (this.currentDirection === 'left') {
-      targetX -= 36;
-      angle = 180;
-    } else if (this.currentDirection === 'down') {
-      targetY += 36;
-      angle = 90;
-    } else {
-      targetY -= 36;
-      angle = -90;
-    }
-
-    // Play element audio & VFX
-    soundManager.playSfx(skill.element as any || 'slash');
-    VFXManager.playEffect(this, (skill.element as any) || 'crystal', targetX, targetY, angle);
-
-    // Special skill mechanics
-    if (skill.id === 'skill_bd_phantom_cut') {
-      // Teleport behind nearest enemy
-      let nearest: EnemyInstance | null = null;
-      let minDist = 300;
-      for (const e of this.enemies) {
-        if (e.hp > 0 && e.sprite.active) {
-          const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, e.sprite.x, e.sprite.y);
-          if (d < minDist) {
-            minDist = d;
-            nearest = e;
-          }
+  public performSkillById(skillId: string) {
+    const targets: EnemyTarget[] = this.enemies.map((enemy) => ({
+      x: enemy.sprite.x,
+      y: enemy.sprite.y,
+      hp: enemy.hp,
+      defense: enemy.defense,
+      type: enemy.type,
+      isDead: enemy.hp <= 0 || !enemy.sprite.active,
+      sprite: enemy.sprite,
+      takeDamage: (amount: number, isCritical: boolean, element: string) => {
+        const sandboxCfg = sandboxManager.getConfig();
+        if (!sandboxCfg.invulnerableEnemies) {
+          enemy.hp -= amount;
         }
-      }
-      if (nearest) {
-        this.player.setPosition(nearest.sprite.x - 24, nearest.sprite.y);
-      }
-    } else if (skill.id === 'skill_fm_blink') {
-      const blinkDist = 110;
-      if (this.currentDirection === 'right') this.player.x += blinkDist;
-      else if (this.currentDirection === 'left') this.player.x -= blinkDist;
-      else if (this.currentDirection === 'down') this.player.y += blinkDist;
-      else if (this.currentDirection === 'up') this.player.y -= blinkDist;
-    }
 
-    if (skill.id === 'skill_gd_unbreakable_wall' || skill.id === 'skill_bd_dash_strike') {
-      this.isDodgeInvulnerable = true;
-      this.time.delayedCall(800, () => {
-        this.isDodgeInvulnerable = false;
-      });
-    }
+        soundManager.playSfx('hit');
 
-    // Hit detection on enemies
-    const range = skill.range || 85;
-    this.enemies.forEach((enemy) => {
-      if (enemy.hp <= 0 || !enemy.sprite.active) return;
-      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.sprite.x, enemy.sprite.y);
-      if (dist <= range) {
-        this.hitEnemyWithSkill(enemy, skill);
-      }
+        let color = '#ffffff';
+        if (element === 'fire') color = '#ef4444';
+        else if (element === 'ice') color = '#38bdf8';
+        else if (element === 'shadow') color = '#c084fc';
+        else if (element === 'crystal') color = '#67e8f9';
+        else if (element === 'earth') color = '#f59e0b';
+        else if (element === 'wind') color = '#a7f3d0';
+
+        this.showFloatingDamage(enemy.sprite.x, enemy.sprite.y - 18, amount, isCritical, color);
+
+        // Knockback
+        const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.sprite.x, enemy.sprite.y);
+        enemy.sprite.setVelocity(Math.cos(angle) * 160, Math.sin(angle) * 160);
+        enemy.sprite.setTint(0xff5555);
+
+        this.time.delayedCall(160, () => {
+          if (enemy.sprite.active) {
+            enemy.sprite.clearTint();
+          }
+        });
+
+        if (enemy.hp <= 0 && !sandboxCfg.invulnerableEnemies) {
+          this.killEnemy(enemy);
+        }
+      },
+    }));
+
+    skillCastingEngine.castSkill(skillId, {
+      scene: this,
+      player: this.player,
+      currentDirection: this.currentDirection,
+      getEnemies: () => targets,
+      setInvulnerable: (invuln: boolean) => {
+        this.isDodgeInvulnerable = invuln;
+      },
     });
-  }
-
-  private hitEnemyWithSkill(enemy: EnemyInstance, skill: any) {
-    const gameStore = useGameStore.getState();
-    const sandboxCfg = sandboxManager.getConfig();
-
-    const effectiveAtk = Math.round(gameStore.stats.attack * skill.damageMultiplier);
-    const dmg = calculateDamage(
-      effectiveAtk,
-      enemy.defense,
-      gameStore.stats.critChance + (skill.isUltimate ? 0.35 : 0),
-      gameStore.stats.critDamage
-    );
-
-    if (!sandboxCfg.invulnerableEnemies) {
-      enemy.hp -= dmg.finalDamage;
-    }
-
-    soundManager.playSfx('hit');
-
-    let color = '#ffffff';
-    if (skill.element === 'fire') color = '#ef4444';
-    else if (skill.element === 'ice') color = '#38bdf8';
-    else if (skill.element === 'shadow') color = '#c084fc';
-    else if (skill.element === 'crystal') color = '#67e8f9';
-    else if (skill.element === 'earth') color = '#f59e0b';
-    else if (skill.element === 'wind') color = '#a7f3d0';
-
-    this.showFloatingDamage(enemy.sprite.x, enemy.sprite.y - 18, dmg.finalDamage, dmg.isCritical, color);
-
-    // Record to Sandbox DPS telemetry
-    sandboxManager.recordDamage(skill.nameEn, enemy.type, dmg.finalDamage, dmg.isCritical, skill.element);
-
-    // Knockback
-    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.sprite.x, enemy.sprite.y);
-    enemy.sprite.setVelocity(Math.cos(angle) * 160, Math.sin(angle) * 160);
-    enemy.sprite.setTint(0xff5555);
-
-    this.time.delayedCall(160, () => {
-      if (enemy.sprite.active) {
-        enemy.sprite.clearTint();
-      }
-    });
-
-    if (enemy.hp <= 0 && !sandboxCfg.invulnerableEnemies) {
-      this.killEnemy(enemy);
-    }
   }
 
   private handleInteractions() {
@@ -915,6 +846,32 @@ export class WorldScene extends Phaser.Scene {
   private enterDungeon() {
     soundManager.playSfx('crystal');
     this.scene.start('DungeonScene', { tier: 1 });
+  }
+
+  private syncPetCompanion() {
+    const gameStore = useGameStore.getState();
+    const activePetId = gameStore.activePetId;
+
+    if (activePetId !== this.currentActivePetId) {
+      this.currentActivePetId = activePetId;
+      if (this.petCompanion) {
+        this.petCompanion.destroy();
+        this.petCompanion = null;
+      }
+
+      if (activePetId) {
+        const petData = gameStore.pets.find((p) => p.id === activePetId);
+        if (petData && this.player) {
+          this.petCompanion = new PetCompanion(
+            this,
+            this.player.x,
+            this.player.y,
+            petData,
+            this.player
+          );
+        }
+      }
+    }
   }
 
   respawnPlayer() {

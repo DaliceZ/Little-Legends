@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { getSkillsForTree, ALL_SKILLS_36 } from '../../features/skills/skillData';
+import { SkillIcon } from '../../features/skills/SkillIcon';
 import { Specialization } from '../../shared/types';
 import { t } from '../../shared/localization';
 import { 
@@ -180,17 +181,7 @@ export const SkillTreeModal: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 border-2 shadow-inner ${
-                      skill.isUltimate 
-                        ? 'bg-amber-950/60 border-amber-400 text-amber-300' 
-                        : 'bg-fantasy-darkest border-fantasy-crystal/60'
-                    }`}>
-                      {skill.tree === 'blade_dancer' ? '🌀' : 
-                       skill.tree === 'guardian' ? '🛡️' : 
-                       skill.tree === 'fire_mage' ? '🔥' : 
-                       skill.tree === 'frost_mage' ? '❄️' : 
-                       skill.tree === 'shadow_assassin' ? '🗡️' : '🔮'}
-                    </div>
+                    <SkillIcon skillId={skill.id} size={48} showCost={true} />
 
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">

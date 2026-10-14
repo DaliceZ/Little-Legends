@@ -4,7 +4,9 @@ import {
   ItemInstance, 
   QuestState, 
   GameSettings, 
-  Achievement 
+  Achievement,
+  PetInstance,
+  PetEggInstance
 } from '../shared/types';
 
 export class LittleLegendsDatabase extends Dexie {
@@ -14,6 +16,8 @@ export class LittleLegendsDatabase extends Dexie {
   skills!: Table<{ id: string; currentRank: number; saveSlot: number }, string>;
   achievements!: Table<Achievement, string>;
   settings!: Table<GameSettings & { id: string }, string>;
+  pets!: Table<PetInstance & { saveSlot: number }, string>;
+  petEggs!: Table<PetEggInstance & { saveSlot: number }, string>;
 
   constructor() {
     super('LittleLegendsDB');
@@ -24,6 +28,10 @@ export class LittleLegendsDatabase extends Dexie {
       skills: '[id+saveSlot], saveSlot',
       achievements: 'id, unlocked',
       settings: 'id',
+    });
+    this.version(2).stores({
+      pets: 'id, saveSlot, speciesId, isActive',
+      petEggs: 'id, saveSlot, rarity',
     });
   }
 }

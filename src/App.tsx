@@ -13,6 +13,8 @@ import { SettingsModal } from './app/modals/SettingsModal';
 import { GameOverModal } from './app/modals/GameOverModal';
 import { MainMenuModal } from './app/modals/MainMenuModal';
 import { SandboxPanel } from './app/modals/SandboxPanel';
+import { PetModal } from './app/modals/PetModal';
+import { HatcheryModal } from './app/modals/HatcheryModal';
 import { saveService } from './persistence/saveService';
 import { soundManager } from './shared/utils/soundSynthesizer';
 
@@ -71,6 +73,12 @@ export const App: React.FC = () => {
       } else if (e.key === 'q' || e.key === 'Q') {
         if (activeModal === 'quests') closeModal();
         else openModal('quests');
+      } else if (e.key === 'p' || e.key === 'P') {
+        if (activeModal === 'pets') closeModal();
+        else openModal('pets');
+      } else if (e.key === 'h' || e.key === 'H') {
+        if (activeModal === 'hatchery') closeModal();
+        else openModal('hatchery');
       } else if (e.key === 'F2') {
         e.preventDefault();
         if (activeModal === 'sandbox') closeModal();
@@ -117,6 +125,8 @@ export const App: React.FC = () => {
       {activeModal === 'character' && <CharacterModal />}
       {activeModal === 'skills' && <SkillTreeModal />}
       {activeModal === 'quests' && <QuestJournalModal />}
+      {activeModal === 'pets' && <PetModal />}
+      {activeModal === 'hatchery' && <HatcheryModal />}
       {activeModal === 'shop' && <ShopModal />}
       {activeModal === 'crafting' && <CraftingModal />}
       {activeModal === 'settings' && <SettingsModal />}

@@ -9,6 +9,11 @@ export const QUEST_REGISTRY: Record<string, QuestDefinition> = {
     descriptionTh: 'ผู้เฒ่าโอรินขอให้เจ้าช่วยกำจัดสไลม์และค้างคาวที่มารบกวนบริเวณแนวชายป่า',
     giverNpcId: 'orin',
     minLevel: 1,
+    targetLocationEn: 'Whispering Forest (East)',
+    targetLocationTh: 'ป่าเสียงกระซิบ (ทิศตะวันออก)',
+    suggestedActionEn: 'Cross eastern river bridge to defeat slimes & bats',
+    suggestedActionTh: 'ข้ามสะพานแม่น้ำทิศตะวันออกเพื่อกำจัดสไลม์และค้างคาว',
+    worldCoordinates: { x: 1200, y: 450, zone: 'forest' },
     objectives: [
       {
         id: 'obj_slimes',
@@ -44,6 +49,11 @@ export const QUEST_REGISTRY: Record<string, QuestDefinition> = {
     descriptionTh: 'รวบรวมเมือกสไลม์ 4 ชิ้นจากสิ่งมีชีวิตในป่า เพื่อให้มิรานำไปปรุงยาสมานแผล',
     giverNpcId: 'mira',
     minLevel: 1,
+    targetLocationEn: 'Village Infirmary / Whispering Forest',
+    targetLocationTh: 'เรือนพยาบาล / ป่าเสียงกระซิบ',
+    suggestedActionEn: 'Collect slime jelly from forest slimes and talk to Mira',
+    suggestedActionTh: 'เก็บเมือกสไลม์จากสไลม์ในป่าแล้วกลับมาส่งให้มิรา',
+    worldCoordinates: { x: 380, y: 320, zone: 'village' },
     objectives: [
       {
         id: 'obj_jelly',
@@ -73,6 +83,11 @@ export const QUEST_REGISTRY: Record<string, QuestDefinition> = {
     descriptionTh: 'โรแวนต้องการหนังหมาป่าพงไพร 2 ผืน เพื่อใช้บุเกราะเสริมความทนทาน',
     giverNpcId: 'rowan',
     minLevel: 2,
+    targetLocationEn: 'Deep Whispering Forest',
+    targetLocationTh: 'ส่วนลึกของป่าเสียงกระซิบ',
+    suggestedActionEn: 'Venture deep east to hunt wild wolves',
+    suggestedActionTh: 'เดินทางเข้าสู่ป่าลึกทิศตะวันออกเพื่อล่าหมาป่าพงไพร',
+    worldCoordinates: { x: 1350, y: 700, zone: 'forest' },
     objectives: [
       {
         id: 'obj_pelts',
@@ -99,6 +114,11 @@ export const QUEST_REGISTRY: Record<string, QuestDefinition> = {
     descriptionTh: 'หัวหน้ากิลด์เอลาราอนุมัติการสำรวจ จงลงสู่ส่วนลึกของดันเจี้ยนและโค่นล้มโกเลมโบราณ!',
     giverNpcId: 'elara',
     minLevel: 3,
+    targetLocationEn: 'Northern Gate (Ancient Ruins Portal)',
+    targetLocationTh: 'ประตูด้านเหนือ (ซุ้มประตูโบราณสถาน)',
+    suggestedActionEn: 'Enter Dungeon Gate to the north and topple Ancient Golem',
+    suggestedActionTh: 'เข้าสู่ประตูดันเจี้ยนทางทิศเหนือเพื่อกำจัดโกเลมโบราณ',
+    worldCoordinates: { x: 500, y: 50, zone: 'village' },
     objectives: [
       {
         id: 'obj_golem',

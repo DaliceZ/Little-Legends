@@ -12,10 +12,13 @@ import {
   Heart,
   Zap,
   Wrench,
-  MapPin
+  MapPin,
+  Navigation,
+  CheckCircle2
 } from 'lucide-react';
 import { getQuestDefinition } from '../../features/quests/questRegistry';
-import { ALL_SKILLS_36 } from '../../features/skills/skillData';
+import { SkillIcon } from '../../features/skills/SkillIcon';
+import { skillCastingEngine } from '../../features/combat/SkillCastingEngine';
 
 export const GameHUD: React.FC = () => {
   const { 
@@ -47,6 +50,35 @@ export const GameHUD: React.FC = () => {
   // Find active quest for tracker
   const activeQuestState = quests.find((q) => q.status === 'active' || q.status === 'completed');
   const activeQuestDef = activeQuestState ? getQuestDefinition(activeQuestState.questId) : null;
+
+  const [navInfo, setNavInfo] = React.useState<{ distance: number; angle: number; inZone: boolean } | null>(null);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      if (!activeQuestDef?.worldCoordinates) {
+        setNavInfo(null);
+        return;
+      }
+      const game = (window as any).Phaser?.GAMES?.[0];
+      const scene = game?.scene?.getScene('WorldScene');
+      if (scene && scene.player) {
+        const px = scene.player.x;
+        const py = scene.player.y;
+        const tx = activeQuestDef.worldCoordinates.x;
+        const ty = activeQuestDef.worldCoordinates.y;
+        const dx = tx - px;
+        const dy = ty - py;
+        const dist = Math.round(Math.sqrt(dx * dx + dy * dy) / 16);
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        const inZone = currentZone === (activeQuestDef.worldCoordinates.zone || 'village') || currentZone === 'village';
+        setNavInfo({ distance: dist, angle, inZone });
+      } else {
+        setNavInfo(null);
+      }
+    }, 250);
+
+    return () => clearInterval(timer);
+  }, [activeQuestDef, currentZone]);
 
   // Quick consumables
   const healthPotion = inventory.find((i) => i.defId === 'item_health_potion');
@@ -198,6 +230,13 @@ export const GameHUD: React.FC = () => {
               <BookOpen size={18} />
             </button>
             <button 
+              onClick={() => openModal('pets')}
+              className="p-2 hover:bg-pink-950/40 text-pink-300 hover:text-pink-100 rounded-lg transition-colors border border-pink-500/30"
+              title="Pet Companions [P]"
+            >
+              <Heart size={18} />
+            </button>
+            <button 
               onClick={() => openModal('sandbox')}
               className="p-2 hover:bg-purple-900/40 text-purple-300 hover:text-purple-100 rounded-lg transition-colors border border-purple-500/30"
               title="Sandbox & Cheats Console [F2]"
@@ -257,73 +296,104 @@ export const GameHUD: React.FC = () => {
 
           {/* 6 Hotbar Skill Slots */}
           <div className="flex items-center gap-1.5">
-            {hotbar.map((skillId, idx) => {
-              const skill = ALL_SKILLS_36[skillId];
-              return (
-                <div key={idx} className="relative group flex flex-col items-center">
-                  <button
-                    onClick={() => {
-                      const game = (window as any).Phaser?.GAMES?.[0];
-                      const scene = game?.scene?.getScene('WorldScene') || game?.scene?.getScene('DungeonScene');
-                      if (scene && (scene as any).performSkillById) {
-                        (scene as any).performSkillById(skillId);
-                      }
-                    }}
-                    className={`w-11 h-11 rounded-xl bg-fantasy-panel hover:bg-slate-800 border-2 flex items-center justify-center transition-all shadow-md active:scale-90 text-lg ${
-                      skill?.isUltimate
-                        ? 'border-amber-400/80 shadow-amber-500/20 shadow-lg'
-                        : 'border-fantasy-border hover:border-fantasy-crystal/70'
-                    }`}
-                    title={
-                      skill 
-                        ? `${lang === 'th' ? skill.nameTh : skill.nameEn} (Hotkey [${idx + 1}])\n${lang === 'th' ? skill.descriptionTh : skill.descriptionEn}` 
-                        : `Slot [${idx + 1}]`
+            {hotbar.map((skillId, idx) => (
+              <div key={idx} className="relative group flex flex-col items-center">
+                <SkillIcon
+                  skillId={skillId}
+                  size={44}
+                  showHotkey={idx + 1}
+                  showCost={true}
+                  cooldownRemainingMs={skillCastingEngine.getCooldownRemaining(skillId)}
+                  cooldownRatio={skillCastingEngine.getCooldownRatio(skillId)}
+                  onClick={() => {
+                    const game = (window as any).Phaser?.GAMES?.[0];
+                    const scene = game?.scene?.getScene('WorldScene') || game?.scene?.getScene('DungeonScene');
+                    if (scene && (scene as any).performSkillById) {
+                      (scene as any).performSkillById(skillId);
                     }
-                  >
-                    {skill ? (
-                      skill.tree === 'blade_dancer' ? '🌀' : 
-                      skill.tree === 'guardian' ? '🛡️' : 
-                      skill.tree === 'fire_mage' ? '🔥' : 
-                      skill.tree === 'frost_mage' ? '❄️' : 
-                      skill.tree === 'shadow_assassin' ? '🗡️' : '🔮'
-                    ) : '•'}
-                  </button>
-                  <span className="absolute -top-1.5 -right-1 bg-slate-900 border border-slate-700 text-fantasy-gold font-mono text-[9px] font-bold px-1 rounded-sm shadow">
-                    {idx + 1}
-                  </span>
-                  {skill && (
-                    <span className="text-[9px] text-slate-400 font-mono mt-0.5">
-                      {skill.costMp > 0 ? `${skill.costMp}m` : skill.costSp > 0 ? `${skill.costSp}s` : '0'}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+                  }}
+                />
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Right: Active Quest Tracker */}
-        <div className="pointer-events-auto w-64 bg-fantasy-dark/90 backdrop-blur-md border border-fantasy-border rounded-xl p-3 shadow-xl">
-          <div className="text-[11px] font-bold text-fantasy-gold uppercase tracking-wider mb-1 flex items-center gap-1.5">
-            <BookOpen size={14} />
-            <span>{t('activeQuest', lang)}</span>
+        {/* Right: Active Quest Tracker & Dynamic Waypoint Compass */}
+        <div className="pointer-events-auto w-72 bg-fantasy-dark/95 backdrop-blur-md border border-fantasy-border/90 rounded-2xl p-3.5 shadow-2xl flex flex-col gap-2">
+          <div className="flex items-center justify-between border-b border-fantasy-border/50 pb-1.5">
+            <div className="text-[11px] font-bold text-fantasy-gold uppercase tracking-wider flex items-center gap-1.5">
+              <BookOpen size={14} className="text-fantasy-gold" />
+              <span>{t('activeQuest', lang)}</span>
+            </div>
+            {activeQuestDef?.targetLocationEn && (
+              <span className="text-[10px] bg-slate-900 border border-slate-700 text-fantasy-crystal px-2 py-0.5 rounded-full flex items-center gap-1">
+                <MapPin size={10} />
+                <span className="truncate max-w-[120px]">
+                  {lang === 'th' ? activeQuestDef.targetLocationTh : activeQuestDef.targetLocationEn}
+                </span>
+              </span>
+            )}
           </div>
+
           {activeQuestDef && activeQuestState ? (
-            <div>
-              <div className="text-xs font-semibold text-slate-100">
-                {lang === 'th' ? activeQuestDef.titleTh : activeQuestDef.titleEn}
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-bold text-slate-100 flex items-center justify-between">
+                <span>{lang === 'th' ? activeQuestDef.titleTh : activeQuestDef.titleEn}</span>
+                {activeQuestState.status === 'completed' && (
+                  <span className="text-[9px] bg-emerald-950 text-emerald-400 border border-emerald-700 px-1.5 py-0.5 rounded font-bold animate-pulse">
+                    COMPLETE!
+                  </span>
+                )}
               </div>
-              <div className="mt-1 flex flex-col gap-1">
+
+              {/* Suggested Action Prompt */}
+              {activeQuestDef.suggestedActionEn && (
+                <div className="text-[11px] bg-fantasy-panel/60 border border-fantasy-border/40 px-2 py-1.5 rounded-lg text-amber-200/90 flex items-start gap-1.5">
+                  <Navigation size={12} className="text-amber-400 shrink-0 mt-0.5" />
+                  <span className="leading-tight">
+                    {lang === 'th' ? activeQuestDef.suggestedActionTh : activeQuestDef.suggestedActionEn}
+                  </span>
+                </div>
+              )}
+
+              {/* Waypoint Compass & Distance */}
+              {navInfo && (
+                <div className="bg-slate-950/80 border border-slate-800 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-5 h-5 rounded-full bg-fantasy-panel border border-fantasy-crystal flex items-center justify-center transition-transform duration-200"
+                      style={{ transform: `rotate(${navInfo.angle}deg)` }}
+                    >
+                      <Navigation size={11} className="text-fantasy-crystal fill-fantasy-crystal" />
+                    </div>
+                    <span className="text-[11px] text-slate-300 font-medium">
+                      {navInfo.distance <= 3 ? (
+                        <span className="text-emerald-400 font-bold flex items-center gap-1">
+                          <CheckCircle2 size={12} /> Target in range!
+                        </span>
+                      ) : (
+                        `${navInfo.distance}m to target`
+                      )}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 uppercase font-mono">
+                    {activeQuestDef.worldCoordinates?.zone || 'World'}
+                  </span>
+                </div>
+              )}
+
+              {/* Objectives List */}
+              <div className="flex flex-col gap-1 border-t border-fantasy-border/30 pt-1.5">
                 {activeQuestDef.objectives.map((obj) => {
                   const stateObj = activeQuestState.objectives.find((o) => o.id === obj.id);
                   const count = stateObj ? stateObj.currentCount : 0;
                   const isDone = count >= obj.targetCount;
                   return (
                     <div key={obj.id} className="text-[11px] flex items-center justify-between text-slate-300">
-                      <span className={isDone ? 'line-through text-emerald-400' : ''}>
+                      <span className={isDone ? 'line-through text-emerald-400 font-medium' : ''}>
                         {lang === 'th' ? obj.descriptionTh.split('(')[0] : obj.descriptionEn.split('(')[0]}
                       </span>
-                      <span className="font-mono font-bold text-xs">
+                      <span className={`font-mono font-bold text-xs ${isDone ? 'text-emerald-400' : 'text-slate-400'}`}>
                         {count}/{obj.targetCount}
                       </span>
                     </div>
@@ -332,7 +402,7 @@ export const GameHUD: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="text-xs text-slate-400 italic">
+            <div className="text-xs text-slate-400 italic py-1">
               {t('noQuests', lang)}
             </div>
           )}
