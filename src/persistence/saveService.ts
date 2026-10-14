@@ -4,7 +4,9 @@ import {
   ItemInstance, 
   QuestState, 
   GameSettings, 
-  Achievement 
+  Achievement,
+  PetInstance,
+  PetEggInstance
 } from '../shared/types';
 
 export interface FullSaveExport {
@@ -15,6 +17,8 @@ export interface FullSaveExport {
   inventory: ItemInstance[];
   quests: QuestState[];
   skills: { id: string; currentRank: number }[];
+  pets?: PetInstance[];
+  petEggs?: PetEggInstance[];
   achievements: Achievement[];
   settings: GameSettings;
 }
@@ -39,9 +43,11 @@ export const saveService = {
     player: PlayerSavedData,
     inventory: ItemInstance[],
     quests: QuestState[],
-    skills: { id: string; currentRank: number }[]
+    skills: { id: string; currentRank: number }[],
+    pets: PetInstance[] = [],
+    petEggs: PetEggInstance[] = []
   ): Promise<void> {
-    await db.transaction('rw', [db.saves, db.inventory, db.quests, db.skills], async () => {
+    await db.transaction('rw', [db.saves, db.inventory, db.quests, db.skills, db.pets, db.petEggs], async () => {
       // 1. Save player record
       await db.saves.put({
         ...player,
@@ -72,6 +78,22 @@ export const saveService = {
           skills.map((s) => ({ ...s, saveSlot: slot }))
         );
       }
+
+      // 5. Clear old slot pets & put new
+      await db.pets.where('saveSlot').equals(slot).delete();
+      if (pets.length > 0) {
+        await db.pets.bulkPut(
+          pets.map((p) => ({ ...p, saveSlot: slot }))
+        );
+      }
+
+      // 6. Clear old slot petEggs & put new
+      await db.petEggs.where('saveSlot').equals(slot).delete();
+      if (petEggs.length > 0) {
+        await db.petEggs.bulkPut(
+          petEggs.map((e) => ({ ...e, saveSlot: slot }))
+        );
+      }
     });
   },
 
@@ -80,6 +102,8 @@ export const saveService = {
     inventory: ItemInstance[];
     quests: QuestState[];
     skills: { id: string; currentRank: number }[];
+    pets: PetInstance[];
+    petEggs: PetEggInstance[];
   } | null> {
     try {
       const player = await db.saves.get(slot);
@@ -94,7 +118,13 @@ export const saveService = {
       const rawSkills = await db.skills.where('saveSlot').equals(slot).toArray();
       const skills = rawSkills.map(({ saveSlot, ...s }) => s);
 
-      return { player, inventory, quests, skills };
+      const rawPets = await db.pets.where('saveSlot').equals(slot).toArray();
+      const pets: PetInstance[] = rawPets.map(({ saveSlot, ...p }) => p);
+
+      const rawEggs = await db.petEggs.where('saveSlot').equals(slot).toArray();
+      const petEggs: PetEggInstance[] = rawEggs.map(({ saveSlot, ...e }) => e);
+
+      return { player, inventory, quests, skills, pets, petEggs };
     } catch (err) {
       console.error('Failed to load save from slot', slot, err);
       return null;
@@ -121,6 +151,8 @@ export const saveService = {
       inventory: data.inventory,
       quests: data.quests,
       skills: data.skills,
+      pets: data.pets,
+      petEggs: data.petEggs,
       achievements,
       settings,
     };
@@ -141,7 +173,9 @@ export const saveService = {
         parsed.player,
         parsed.inventory || [],
         parsed.quests || [],
-        parsed.skills || []
+        parsed.skills || [],
+        parsed.pets || [],
+        parsed.petEggs || []
       );
 
       if (parsed.settings) {
@@ -156,11 +190,13 @@ export const saveService = {
   },
 
   async clearSlot(slot: number = 1): Promise<void> {
-    await db.transaction('rw', [db.saves, db.inventory, db.quests, db.skills], async () => {
+    await db.transaction('rw', [db.saves, db.inventory, db.quests, db.skills, db.pets, db.petEggs], async () => {
       await db.saves.delete(slot);
       await db.inventory.where('saveSlot').equals(slot).delete();
       await db.quests.where('saveSlot').equals(slot).delete();
       await db.skills.where('saveSlot').equals(slot).delete();
+      await db.pets.where('saveSlot').equals(slot).delete();
+      await db.petEggs.where('saveSlot').equals(slot).delete();
     });
   },
 };

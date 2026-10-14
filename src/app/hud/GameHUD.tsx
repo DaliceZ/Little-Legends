@@ -28,7 +28,6 @@ export const GameHUD: React.FC = () => {
     gold, 
     echoShards, 
     quests, 
-    notifications,
     openModal,
     settings,
     inventory,
@@ -158,18 +157,8 @@ export const GameHUD: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Notifications Toasts */}
-        <div className="flex flex-col items-center gap-2 pointer-events-none">
-          {notifications.map((notif) => (
-            <div 
-              key={notif.id}
-              className="bg-fantasy-dark/95 border border-fantasy-gold/50 text-slate-100 px-4 py-2 rounded-lg shadow-xl text-center animate-bounce duration-500 backdrop-blur-sm"
-            >
-              <div className="text-xs font-bold text-fantasy-gold">{notif.title}</div>
-              <div className="text-xs text-slate-200">{notif.message}</div>
-            </div>
-          ))}
-        </div>
+        {/* Center: Top spacer / HUD title area */}
+        <div className="flex flex-col items-center gap-2 pointer-events-none" />
 
         {/* Right: Currencies, Minimap radar & Menu Bar */}
         <div className="flex flex-col items-end gap-2">

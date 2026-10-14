@@ -34,7 +34,7 @@ class SoundSynthesizer {
   }
 
   // Play standard retro sound effects
-  playSfx(type: 'slash' | 'hit' | 'dodge' | 'pickup' | 'levelup' | 'quest' | 'click' | 'potion' | 'boss_roar' | 'crystal' | 'fire' | 'ice' | 'shadow' | 'lightning' | 'earth' | 'ultimate' | 'victory' | 'wind') {
+  playSfx(type: 'slash' | 'hit' | 'dodge' | 'pickup' | 'levelup' | 'quest' | 'click' | 'potion' | 'boss_roar' | 'crystal' | 'fire' | 'ice' | 'shadow' | 'lightning' | 'earth' | 'ultimate' | 'victory' | 'wind' | 'error' | 'warning') {
     if (this.isMuted || this.masterVol <= 0 || this.sfxVol <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
@@ -183,6 +183,34 @@ class SoundSynthesizer {
         osc.connect(gainNode);
         osc.start(now);
         osc.stop(now + 0.04);
+        break;
+      }
+      case 'error': {
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.linearRampToValueAtTime(110, now + 0.18);
+
+        gainNode.gain.setValueAtTime(netVolume * 0.7, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+        osc.connect(gainNode);
+        osc.start(now);
+        osc.stop(now + 0.2);
+        break;
+      }
+      case 'warning': {
+        const osc = this.ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.linearRampToValueAtTime(370, now + 0.12);
+
+        gainNode.gain.setValueAtTime(netVolume * 0.6, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+        osc.connect(gainNode);
+        osc.start(now);
+        osc.stop(now + 0.14);
         break;
       }
       case 'boss_roar': {

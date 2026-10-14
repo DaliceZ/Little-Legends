@@ -37,11 +37,15 @@ export type ActiveModal =
   | 'pets'
   | 'hatchery';
 
+export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'loot';
+
 export interface NotificationToast {
   id: string;
   title: string;
   message: string;
-  type?: 'info' | 'success' | 'warning' | 'loot';
+  type?: NotificationType;
+  valueDelta?: string;
+  timestamp: number;
 }
 
 interface GameState {
@@ -77,7 +81,7 @@ interface GameState {
   closeModal: () => void;
   setDialogue: (dialogue: { npcId: string; nodeId: string } | null) => void;
   closeDialogue: () => void;
-  showNotification: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'loot') => void;
+  showNotification: (title: string, message: string, type?: NotificationType, valueDelta?: string) => void;
   removeNotification: (id: string) => void;
   setZone: (zone: 'village' | 'forest' | 'dungeon', tier?: number) => void;
   setIsSandbox: (isSandbox: boolean) => void;
@@ -279,14 +283,35 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
 
-  showNotification: (title, message, type = 'info') => {
-    const id = `notif_${Date.now()}_${Math.random()}`;
+  showNotification: (title, message, type = 'info', valueDelta) => {
+    const now = Date.now();
+    // Duplicate suppression: if an identical title and message occurred within 1200ms, suppress
+    const recent = get().notifications.find(
+      (n) => n.title === title && n.message === message && now - n.timestamp < 1200
+    );
+    if (recent) return;
+
+    // Trigger audio feedback based on notification type
+    if (type === 'error') {
+      soundManager.playSfx('error');
+    } else if (type === 'warning') {
+      soundManager.playSfx('warning');
+    } else if (type === 'loot') {
+      soundManager.playSfx('pickup');
+    } else if (type === 'success') {
+      soundManager.playSfx('quest');
+    }
+
+    const id = `notif_${now}_${Math.random().toString(36).substring(2, 7)}`;
     set((state) => ({
-      notifications: [...state.notifications.slice(-4), { id, title, message, type }],
+      notifications: [
+        ...state.notifications.slice(-4),
+        { id, title, message, type, valueDelta, timestamp: now },
+      ],
     }));
     setTimeout(() => {
       get().removeNotification(id);
-    }, 3500);
+    }, 4000);
   },
 
   removeNotification: (id) => {
@@ -705,7 +730,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       },
       state.inventory,
       state.quests,
-      state.skills
+      state.skills,
+      state.pets,
+      state.petEggs
     );
     soundManager.playSfx('crystal');
     get().showNotification('SAVED', 'Game progress saved to browser storage!', 'success');
@@ -714,6 +741,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   loadSavedGame: async () => {
     const data = await saveService.loadGame(1);
     if (!data) return false;
+
+    const activePet = data.pets?.find((p) => p.isActive) || (data.pets && data.pets.length > 0 ? data.pets[0] : null);
 
     set({
       level: data.player.level,
@@ -727,6 +756,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       inventory: data.inventory,
       quests: data.quests,
       skills: data.skills,
+      pets: data.pets || [],
+      petEggs: data.petEggs || [],
+      activePetId: activePet ? activePet.id : null,
       stats: {
         ...get().stats,
         hp: data.player.currentHp,
@@ -768,6 +800,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         InventoryManager.createItemInstance('item_health_potion', 3)!,
         InventoryManager.createItemInstance('item_mana_potion', 2)!,
       ],
+      pets: [],
+      petEggs: [
+        EggDropManager.createEggInstance('common', 'forest_slime'),
+      ],
+      activePetId: null,
       quests: [
         {
           questId: 'quest_cleansing_forest',

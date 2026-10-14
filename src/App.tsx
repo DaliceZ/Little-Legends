@@ -15,6 +15,8 @@ import { MainMenuModal } from './app/modals/MainMenuModal';
 import { SandboxPanel } from './app/modals/SandboxPanel';
 import { PetModal } from './app/modals/PetModal';
 import { HatcheryModal } from './app/modals/HatcheryModal';
+import { PauseModal } from './app/modals/PauseModal';
+import { ToastContainer } from './app/components/ui/ToastContainer';
 import { saveService } from './persistence/saveService';
 import { soundManager } from './shared/utils/soundSynthesizer';
 
@@ -56,10 +58,12 @@ export const App: React.FC = () => {
       if (e.key === 'Escape') {
         if (currentDialogue) {
           closeDialogue();
+        } else if (activeModal === 'pause') {
+          closeModal();
         } else if (activeModal !== 'none') {
           closeModal();
         } else {
-          openModal('settings');
+          openModal('pause');
         }
       } else if (e.key === 'i' || e.key === 'I') {
         if (activeModal === 'inventory') closeModal();
@@ -90,6 +94,18 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isPlaying, activeModal, currentDialogue, openModal, closeModal, closeDialogue]);
 
+  const handleReturnToMainMenu = () => {
+    closeModal();
+    setIsPlaying(false);
+    const game = (window as any).Phaser?.GAMES?.[0];
+    if (game) {
+      if (game.scene.isActive('DungeonScene')) {
+        game.scene.stop('DungeonScene');
+      }
+      game.scene.start('WorldScene');
+    }
+  };
+
   const handleRespawn = () => {
     setPlayerStats({
       ...stats,
@@ -109,6 +125,9 @@ export const App: React.FC = () => {
       {/* Phaser Canvas */}
       <GameCanvas />
 
+      {/* Global Notifications Container */}
+      <ToastContainer />
+
       {/* Main Game In-Play HUD */}
       {isPlaying && <GameHUD />}
 
@@ -121,6 +140,9 @@ export const App: React.FC = () => {
       {isPlaying && <DialogueBox />}
 
       {/* UI Modals */}
+      {activeModal === 'pause' && (
+        <PauseModal onResume={closeModal} onReturnToMainMenu={handleReturnToMainMenu} />
+      )}
       {activeModal === 'inventory' && <InventoryModal />}
       {activeModal === 'character' && <CharacterModal />}
       {activeModal === 'skills' && <SkillTreeModal />}
