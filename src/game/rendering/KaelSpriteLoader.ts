@@ -152,6 +152,11 @@ export class KaelSpriteLoader {
     });
   }
 
+  /**
+   * Exterior-only BFS Flood-Fill transparency:
+   * Only background pixels contiguous to the outer borders are cleared.
+   * Internal dark areas (obsidian horns, dark armor, boots, dark hair) are 100% preserved.
+   */
   private static removeBackground(
     ctx: CanvasRenderingContext2D,
     w: number,
@@ -162,21 +167,80 @@ export class KaelSpriteLoader {
   ) {
     const imgData = ctx.getImageData(0, 0, w, h);
     const data = imgData.data;
-    const threshold = 40;
+    const threshold = 36;
+    const visited = new Uint8Array(w * h);
+    const queue: number[] = [];
 
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
+    // Helper to test if a pixel matches background
+    const isBg = (idx: number): boolean => {
+      const p = idx * 4;
+      const r = data[p];
+      const g = data[p + 1];
+      const b = data[p + 2];
       const dist = Math.sqrt(
         (r - targetR) * (r - targetR) +
         (g - targetG) * (g - targetG) +
         (b - targetB) * (b - targetB)
       );
+      return dist < threshold;
+    };
 
-      if (dist < threshold) {
-        data[i + 3] = 0;
+    // Seed perimeter pixels
+    for (let x = 0; x < w; x++) {
+      // Top row
+      const topIdx = x;
+      if (isBg(topIdx)) {
+        visited[topIdx] = 1;
+        data[topIdx * 4 + 3] = 0;
+        queue.push(topIdx);
+      }
+      // Bottom row
+      const btmIdx = (h - 1) * w + x;
+      if (isBg(btmIdx)) {
+        visited[btmIdx] = 1;
+        data[btmIdx * 4 + 3] = 0;
+        queue.push(btmIdx);
+      }
+    }
+
+    for (let y = 0; y < h; y++) {
+      // Left col
+      const leftIdx = y * w;
+      if (!visited[leftIdx] && isBg(leftIdx)) {
+        visited[leftIdx] = 1;
+        data[leftIdx * 4 + 3] = 0;
+        queue.push(leftIdx);
+      }
+      // Right col
+      const rightIdx = y * w + (w - 1);
+      if (!visited[rightIdx] && isBg(rightIdx)) {
+        visited[rightIdx] = 1;
+        data[rightIdx * 4 + 3] = 0;
+        queue.push(rightIdx);
+      }
+    }
+
+    // BFS Queue processing
+    let head = 0;
+    while (head < queue.length) {
+      const curr = queue[head++];
+      const cx = curr % w;
+      const cy = Math.floor(curr / w);
+
+      // Check 4 neighbors
+      const neighbors = [
+        cx > 0 ? curr - 1 : -1,
+        cx < w - 1 ? curr + 1 : -1,
+        cy > 0 ? curr - w : -1,
+        cy < h - 1 ? curr + w : -1,
+      ];
+
+      for (const n of neighbors) {
+        if (n !== -1 && !visited[n] && isBg(n)) {
+          visited[n] = 1;
+          data[n * 4 + 3] = 0;
+          queue.push(n);
+        }
       }
     }
 
