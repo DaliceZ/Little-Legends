@@ -271,7 +271,7 @@ export class SkillCastingEngine {
 
     // 4. Play audio & VFX
     soundManager.playSfx((skill.element as any) || 'slash');
-    VFXManager.playEffect(scene, (skill.element as any) || 'crystal', targetX, targetY, angle);
+    VFXManager.playEffect(scene, skill.element || 'physical', targetX, targetY, angle);
 
     // Ultimate screen shake
     if (skill.isUltimate) {
