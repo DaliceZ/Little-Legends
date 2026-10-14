@@ -37,6 +37,7 @@ export const GameHUD: React.FC = () => {
     currentZone,
     dungeonTier,
     isSandbox,
+    dungeonBlessing,
   } = useGameStore();
 
   const lang = settings.language;
@@ -88,73 +89,83 @@ export const GameHUD: React.FC = () => {
       {/* --- TOP ROW --- */}
       <div className="flex justify-between items-start w-full">
         {/* Left: Player Profile & Stat Bars */}
-        <div className="pointer-events-auto bg-fantasy-dark/90 backdrop-blur-md border border-fantasy-border rounded-xl p-3 shadow-2xl flex items-center gap-3">
-          {/* Avatar & Level */}
-          <div className="relative">
-            <div className="w-14 h-14 rounded-lg bg-fantasy-panel border-2 border-fantasy-gold/60 flex items-center justify-center overflow-hidden shadow-inner">
-              {kaelPortrait ? (
-                <img src={kaelPortrait} alt="Drakon" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-2xl font-bold text-fantasy-crystal">✦</span>
-              )}
+        <div className="flex flex-col gap-1.5 items-start">
+          <div className="pointer-events-auto bg-fantasy-dark/90 backdrop-blur-md border border-fantasy-border rounded-xl p-3 shadow-2xl flex items-center gap-3">
+            {/* Avatar & Level */}
+            <div className="relative">
+              <div className="w-14 h-14 rounded-lg bg-fantasy-panel border-2 border-fantasy-gold/60 flex items-center justify-center overflow-hidden shadow-inner">
+                {kaelPortrait ? (
+                  <img src={kaelPortrait} alt="Drakon" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-bold text-fantasy-crystal">✦</span>
+                )}
+              </div>
+              <div className="absolute -bottom-1 -right-1 bg-fantasy-gold text-fantasy-darkest text-xs font-extrabold px-1.5 py-0.5 rounded shadow">
+                Lv.{level}
+              </div>
             </div>
-            <div className="absolute -bottom-1 -right-1 bg-fantasy-gold text-fantasy-darkest text-xs font-extrabold px-1.5 py-0.5 rounded shadow">
-              Lv.{level}
+
+            {/* Vitals Bars */}
+            <div className="flex flex-col gap-1.5 w-44">
+              {/* HP */}
+              <div>
+                <div className="flex justify-between text-[11px] font-semibold text-slate-200 mb-0.5">
+                  <span className="text-red-400 flex items-center gap-1"><Heart size={12} /> HP</span>
+                  <span>{Math.round(stats.hp)} / {stats.maxHp}</span>
+                </div>
+                <div className="h-2.5 w-full bg-fantasy-hpBg rounded-full overflow-hidden border border-red-950">
+                  <div 
+                    className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-200"
+                    style={{ width: `${hpPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* MP */}
+              <div>
+                <div className="flex justify-between text-[11px] font-semibold text-slate-200 mb-0.5">
+                  <span className="text-blue-400 flex items-center gap-1"><Sparkles size={12} /> MP</span>
+                  <span>{Math.round(stats.mp)} / {stats.maxMp}</span>
+                </div>
+                <div className="h-2 w-full bg-fantasy-mpBg rounded-full overflow-hidden border border-blue-950">
+                  <div 
+                    className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-200"
+                    style={{ width: `${mpPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* SP (Stamina) */}
+              <div>
+                <div className="flex justify-between text-[11px] font-semibold text-slate-200 mb-0.5">
+                  <span className="text-emerald-400 flex items-center gap-1"><Zap size={12} /> SP</span>
+                  <span>{Math.round(stats.sp)} / {stats.maxSp}</span>
+                </div>
+                <div className="h-2 w-full bg-fantasy-spBg rounded-full overflow-hidden border border-emerald-950">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-200"
+                    style={{ width: `${spPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* EXP Bar */}
+              <div className="w-full bg-slate-900 h-1 rounded-full overflow-hidden mt-0.5">
+                <div 
+                  className="bg-purple-400 h-full transition-all duration-300"
+                  style={{ width: `${expPercent}%` }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Vitals Bars */}
-          <div className="flex flex-col gap-1.5 w-44">
-            {/* HP */}
-            <div>
-              <div className="flex justify-between text-[11px] font-semibold text-slate-200 mb-0.5">
-                <span className="text-red-400 flex items-center gap-1"><Heart size={12} /> HP</span>
-                <span>{Math.round(stats.hp)} / {stats.maxHp}</span>
-              </div>
-              <div className="h-2.5 w-full bg-fantasy-hpBg rounded-full overflow-hidden border border-red-950">
-                <div 
-                  className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-200"
-                  style={{ width: `${hpPercent}%` }}
-                />
-              </div>
+          {/* Active Dungeon Blessing Pill */}
+          {dungeonBlessing && (
+            <div className="pointer-events-auto bg-sky-950/90 border border-sky-400/60 backdrop-blur-md rounded-lg px-2.5 py-1 text-[11px] font-semibold text-sky-200 flex items-center gap-1.5 shadow-md">
+              <Sparkles size={12} className="text-sky-300 animate-spin" />
+              <span>Blessing: {dungeonBlessing}</span>
             </div>
-
-            {/* MP */}
-            <div>
-              <div className="flex justify-between text-[11px] font-semibold text-slate-200 mb-0.5">
-                <span className="text-blue-400 flex items-center gap-1"><Sparkles size={12} /> MP</span>
-                <span>{Math.round(stats.mp)} / {stats.maxMp}</span>
-              </div>
-              <div className="h-2 w-full bg-fantasy-mpBg rounded-full overflow-hidden border border-blue-950">
-                <div 
-                  className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-200"
-                  style={{ width: `${mpPercent}%` }}
-                />
-              </div>
-            </div>
-
-            {/* SP (Stamina) */}
-            <div>
-              <div className="flex justify-between text-[11px] font-semibold text-slate-200 mb-0.5">
-                <span className="text-emerald-400 flex items-center gap-1"><Zap size={12} /> SP</span>
-                <span>{Math.round(stats.sp)} / {stats.maxSp}</span>
-              </div>
-              <div className="h-2 w-full bg-fantasy-spBg rounded-full overflow-hidden border border-emerald-950">
-                <div 
-                  className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-200"
-                  style={{ width: `${spPercent}%` }}
-                />
-              </div>
-            </div>
-
-            {/* EXP Bar */}
-            <div className="w-full bg-slate-900 h-1 rounded-full overflow-hidden mt-0.5">
-              <div 
-                className="bg-purple-400 h-full transition-all duration-300"
-                style={{ width: `${expPercent}%` }}
-              />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Center: Top spacer / HUD title area */}

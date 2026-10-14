@@ -229,6 +229,7 @@ export interface GameSettings {
   musicVolume: number;
   screenShake: boolean;
   reducedMotion: boolean;
+  graphicsQuality?: 'low' | 'medium' | 'high';
 }
 
 export interface Achievement {

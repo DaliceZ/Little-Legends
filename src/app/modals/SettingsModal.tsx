@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { saveService } from '../../persistence/saveService';
 import { t } from '../../shared/localization';
-import { X, Volume2, Globe, Download, Upload, Save, RefreshCw } from 'lucide-react';
+import { X, Volume2, Globe, Download, Upload, Save, RefreshCw, Monitor } from 'lucide-react';
 import { soundManager } from '../../shared/utils/soundSynthesizer';
 
 export const SettingsModal: React.FC = () => {
@@ -160,6 +160,70 @@ export const SettingsModal: React.FC = () => {
                 onChange={(e) => setSettings({ musicVolume: parseFloat(e.target.value) })}
                 className="w-full accent-fantasy-gold cursor-pointer"
               />
+            </div>
+          </div>
+
+          {/* Graphics & Visual Comfort */}
+          <div className="flex flex-col gap-3 pt-2 border-t border-fantasy-border/80">
+            <div className="text-xs font-bold text-slate-300 flex items-center gap-2">
+              <Monitor size={16} className="text-fantasy-crystal" />
+              <span>Graphics & Visual Comfort</span>
+            </div>
+
+            {/* Quality Preset */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-slate-400">Particle Effects Quality</span>
+              <div className="grid grid-cols-3 gap-2">
+                {(['low', 'medium', 'high'] as const).map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => {
+                      setSettings({ graphicsQuality: q });
+                      soundManager.playSfx('click');
+                    }}
+                    className={`py-1.5 rounded-lg text-xs font-semibold capitalize border transition-all ${
+                      (settings.graphicsQuality || 'high') === q
+                        ? 'bg-fantasy-panel border-fantasy-gold text-fantasy-gold shadow'
+                        : 'bg-fantasy-darkest border-fantasy-border text-slate-400'
+                    }`}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Toggles: Screen Shake & Reduced Motion */}
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button
+                onClick={() => {
+                  setSettings({ screenShake: !settings.screenShake });
+                  soundManager.playSfx('click');
+                }}
+                className={`py-2 px-3 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  settings.screenShake
+                    ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                    : 'bg-fantasy-darkest border-fantasy-border text-slate-400'
+                }`}
+              >
+                <span>Screen Shake</span>
+                <span className="font-bold">{settings.screenShake ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setSettings({ reducedMotion: !settings.reducedMotion });
+                  soundManager.playSfx('click');
+                }}
+                className={`py-2 px-3 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  settings.reducedMotion
+                    ? 'bg-amber-950/40 border-amber-500/50 text-amber-300'
+                    : 'bg-fantasy-darkest border-fantasy-border text-slate-400'
+                }`}
+              >
+                <span>Reduced Motion</span>
+                <span className="font-bold">{settings.reducedMotion ? 'ON' : 'OFF'}</span>
+              </button>
             </div>
           </div>
 

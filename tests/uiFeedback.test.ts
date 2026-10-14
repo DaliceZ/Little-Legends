@@ -28,6 +28,7 @@ describe('UI Feedback & Centralized Notifications', () => {
       },
     });
     sandboxManager.clearCommandHistory();
+    (vi.spyOn(saveService, 'saveSettings') as any).mockResolvedValue(undefined);
   });
 
   it('adds notifications with type and valueDelta', () => {
@@ -265,5 +266,19 @@ describe('Save Service Pet & Egg Persistence', () => {
     expect(loaded?.pets[0].nickname).toBe('Draco');
     expect(loaded?.petEggs.length).toBe(1);
     expect(loaded?.petEggs[0].rarity).toBe('legendary');
+  });
+
+  it('updates settings for graphics quality, screen shake, and reduced motion', () => {
+    const store = useGameStore.getState();
+    store.setSettings({
+      graphicsQuality: 'medium',
+      screenShake: false,
+      reducedMotion: true,
+    });
+
+    const updated = useGameStore.getState().settings;
+    expect(updated.graphicsQuality).toBe('medium');
+    expect(updated.screenShake).toBe(false);
+    expect(updated.reducedMotion).toBe(true);
   });
 });

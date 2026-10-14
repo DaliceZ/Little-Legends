@@ -45,4 +45,5 @@ export const DEFAULT_SETTINGS: GameSettings = {
   musicVolume: 0.6,
   screenShake: true,
   reducedMotion: false,
+  graphicsQuality: 'high',
 };

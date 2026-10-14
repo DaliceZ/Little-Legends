@@ -75,6 +75,9 @@ interface GameState {
   pets: PetInstance[];
   petEggs: PetEggInstance[];
   activePetId: string | null;
+  dungeonBlessing: string | null;
+  dungeonsCleared: number;
+  monstersDefeated: Record<string, number>;
 
   // Actions
   openModal: (modal: ActiveModal) => void;
@@ -87,6 +90,9 @@ interface GameState {
   setIsSandbox: (isSandbox: boolean) => void;
   setKaelPortrait: (url: string) => void;
   setHotbarSkill: (slotIndex: number, skillId: string) => void;
+  setDungeonBlessing: (blessing: string | null) => void;
+  recordMonsterDefeated: (type: string) => void;
+  incrementDungeonsCleared: () => void;
 
   addPet: (speciesId: PetSpeciesId, nickname?: string) => PetInstance;
   setActivePet: (petId: string | null) => void;
@@ -185,6 +191,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     EggDropManager.createEggInstance('common', 'forest_slime'),
   ],
   activePetId: null,
+  dungeonBlessing: null,
+  dungeonsCleared: 0,
+  monstersDefeated: {},
+
+  setDungeonBlessing: (blessing) => set({ dungeonBlessing: blessing }),
+  recordMonsterDefeated: (type) => {
+    set((state) => ({
+      monstersDefeated: {
+        ...state.monstersDefeated,
+        [type]: (state.monstersDefeated[type] || 0) + 1,
+      },
+    }));
+  },
+  incrementDungeonsCleared: () => {
+    set((state) => ({ dungeonsCleared: state.dungeonsCleared + 1 }));
+  },
 
   openModal: (modal) => {
     soundManager.playSfx('click');

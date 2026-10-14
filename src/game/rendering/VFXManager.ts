@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { useGameStore } from '../../app/store/useGameStore';
 
 export class VFXManager {
   private static addTextureIfMissing(
@@ -381,7 +382,8 @@ export class VFXManager {
       },
     });
 
-    if (shakeIntensity > 0 && scene.cameras?.main) {
+    const screenShake = useGameStore.getState().settings?.screenShake ?? true;
+    if (shakeIntensity > 0 && scene.cameras?.main && screenShake) {
       scene.cameras.main.shake(shakeDuration, shakeIntensity);
     }
   }

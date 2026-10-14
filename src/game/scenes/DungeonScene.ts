@@ -21,6 +21,8 @@ interface DungeonEnemy {
   speed: number;
   attackCooldown: number;
   isBoss?: boolean;
+  bossPhase?: number;
+  isEnraged?: boolean;
 }
 
 interface DungeonChest {
@@ -28,6 +30,15 @@ interface DungeonChest {
   opened: boolean;
   x: number;
   y: number;
+}
+
+interface DungeonShrine {
+  sprite: Phaser.GameObjects.Sprite;
+  x: number;
+  y: number;
+  activated: boolean;
+  type: 'phoenix' | 'wind' | 'dragon';
+  prompt: Phaser.GameObjects.Text;
 }
 
 export class DungeonScene extends Phaser.Scene {
@@ -50,6 +61,8 @@ export class DungeonScene extends Phaser.Scene {
 
   private enemies: DungeonEnemy[] = [];
   private chests: DungeonChest[] = [];
+  private shrines: DungeonShrine[] = [];
+  private bossDefeatedThisRun: boolean = false;
   private wallsGroup!: Phaser.Physics.Arcade.StaticGroup;
   private playerShadow!: Phaser.GameObjects.Ellipse;
 
@@ -69,6 +82,8 @@ export class DungeonScene extends Phaser.Scene {
     this.dungeonMap = DungeonGenerator.generate(seed, this.tier);
     this.enemies = [];
     this.chests = [];
+    this.shrines = [];
+    this.bossDefeatedThisRun = false;
   }
 
   create() {
@@ -246,6 +261,33 @@ export class DungeonScene extends Phaser.Scene {
         this.add.image(p2X, p2Y, 'prop_dungeon_pillar').setDepth(p2Y + 16);
       }
 
+      // 4. Mysterious Ancient Shrine in intermediate rooms
+      if (room.id === 1 || (room.id === 2 && room.type === 'treasure')) {
+        const sx = rx + rw / 2;
+        const sy = ry + 48;
+        const shrineSprite = this.add.sprite(sx, sy, 'prop_dungeon_altar').setDepth(sy);
+        this.lightingManager.addPointLight(sx, sy, 80, 0x38bdf8, 0.48, true);
+
+        const promptText = this.add.text(sx, sy - 22, '[E] Pray at Shrine', {
+          fontSize: '10px',
+          color: '#fbbf24',
+          backgroundColor: '#0f172a',
+          padding: { x: 4, y: 2 },
+        }).setOrigin(0.5).setVisible(false).setDepth(300);
+
+        const shrineTypes: ('phoenix' | 'wind' | 'dragon')[] = ['phoenix', 'wind', 'dragon'];
+        const chosenType = shrineTypes[(room.id) % shrineTypes.length];
+
+        this.shrines.push({
+          sprite: shrineSprite,
+          x: sx,
+          y: sy,
+          activated: false,
+          type: chosenType,
+          prompt: promptText,
+        });
+      }
+
       // Spawn Chests
       if (room.chestSpawn) {
         const cx = room.chestSpawn.x * tileSize + 16;
@@ -312,6 +354,7 @@ export class DungeonScene extends Phaser.Scene {
 
     this.handlePlayerInput(time, delta);
     this.handleChestInteractions();
+    this.handleShrineInteractions();
     this.updateEnemies(time, delta);
 
     // Sync and Update Pet Companion
@@ -325,6 +368,7 @@ export class DungeonScene extends Phaser.Scene {
         takeDamage: (amount, isCrit, _elem) => {
           e.hp -= amount;
           this.showFloatingDamage(e.sprite.x, e.sprite.y - 18, amount, isCrit, '#fbbf24');
+          this.checkBossEnrage(e);
           if (e.hp <= 0) this.killEnemy(e);
         }
       })));
@@ -493,6 +537,8 @@ export class DungeonScene extends Phaser.Scene {
           if (enemy.sprite.active) enemy.sprite.clearTint();
         });
 
+        this.checkBossEnrage(enemy);
+
         if (enemy.hp <= 0 && !sandboxCfg.invulnerableEnemies) {
           this.killEnemy(enemy);
         }
@@ -558,13 +604,21 @@ export class DungeonScene extends Phaser.Scene {
       if (enemy.sprite.active) enemy.sprite.clearTint();
     });
 
+    this.checkBossEnrage(enemy);
+
     if (enemy.hp <= 0 && !sandboxCfg.invulnerableEnemies) {
       this.killEnemy(enemy);
     }
   }
 
   private killEnemy(enemy: DungeonEnemy) {
+    // Record defeated monster in store
+    useGameStore.getState().recordMonsterDefeated(enemy.type);
+
     if (enemy.isBoss) {
+      this.bossDefeatedThisRun = true;
+      this.createLootBeam(enemy.sprite.x, enemy.sprite.y, 0xfbbf24);
+
       soundManager.playSfx('crystal');
       useGameStore.getState().updateExpAndGold(400, 200, 3);
       useGameStore.getState().addItemToInventory('item_golem_core', 1);
@@ -730,30 +784,224 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
+  private handleShrineInteractions() {
+    for (const shrine of this.shrines) {
+      if (shrine.activated) {
+        shrine.prompt.setVisible(false);
+        continue;
+      }
+
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, shrine.x, shrine.y);
+      if (dist < 46) {
+        shrine.prompt.setVisible(true);
+
+        if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+          shrine.activated = true;
+          shrine.prompt.setVisible(false);
+          soundManager.playSfx('crystal');
+
+          // Visual effect on shrine
+          shrine.sprite.setTint(0x67e8f9);
+          this.createLootBeam(shrine.x, shrine.y, 0x38bdf8);
+
+          const store = useGameStore.getState();
+          const stats = store.stats;
+
+          if (shrine.type === 'phoenix') {
+            const newMaxHp = stats.maxHp + 25;
+            store.setPlayerStats({
+              ...stats,
+              maxHp: newMaxHp,
+              hp: newMaxHp,
+              mp: stats.maxMp,
+            });
+            store.setDungeonBlessing('Phoenix Vigor (+25 Max HP & Full Heal)');
+            store.showNotification(
+              'SHRINE OF THE PHOENIX',
+              'Granted Phoenix Vigor! Max HP increased and vitals fully restored.',
+              'success'
+            );
+          } else if (shrine.type === 'wind') {
+            store.setPlayerStats({
+              ...stats,
+              critChance: Math.min(1.0, stats.critChance + 0.15),
+              speed: stats.speed + 25,
+            });
+            store.setDungeonBlessing('Zephyr Swiftness (+15% Crit & +25 Speed)');
+            store.showNotification(
+              'SHRINE OF ZEPHYR',
+              'Granted Zephyr Swiftness! +15% Crit Chance and +25 Movement Speed.',
+              'success'
+            );
+          } else if (shrine.type === 'dragon') {
+            store.setPlayerStats({
+              ...stats,
+              attack: stats.attack + 8,
+              defense: stats.defense + 4,
+            });
+            store.setDungeonBlessing('Dragon Wrath (+8 Atk & +4 Def)');
+            store.showNotification(
+              'SHRINE OF THE DRAGON',
+              'Granted Dragon Wrath! +8 Attack and +4 Defense for this expedition.',
+              'success'
+            );
+          }
+        }
+      } else {
+        shrine.prompt.setVisible(false);
+      }
+    }
+  }
+
+  private checkBossEnrage(enemy: DungeonEnemy) {
+    if (enemy.isBoss && !enemy.isEnraged && enemy.hp > 0 && enemy.hp <= enemy.maxHp * 0.5) {
+      this.triggerBossEnrage(enemy);
+    }
+  }
+
+  private triggerBossEnrage(enemy: DungeonEnemy) {
+    enemy.isEnraged = true;
+    enemy.bossPhase = 2;
+    enemy.attack = Math.round(enemy.attack * 1.35);
+    enemy.speed = Math.round(enemy.speed * 1.35);
+
+    // Weather shifts to dramatic floating fire embers
+    if (this.weatherManager) {
+      this.weatherManager.setWeather('embers');
+    }
+
+    soundManager.playSfx('boss_roar');
+    this.cameras.main.shake(500, 0.02);
+
+    // Enrage visual: scale pulse and persistent red tint
+    this.tweens.add({
+      targets: enemy.sprite,
+      scaleX: enemy.sprite.scaleX * 1.2,
+      scaleY: enemy.sprite.scaleY * 1.2,
+      duration: 350,
+      yoyo: true,
+      repeat: 1,
+      ease: 'Back.easeOut',
+    });
+
+    // Add glowing red point light for enraged boss
+    this.lightingManager.addPointLight(enemy.sprite.x, enemy.sprite.y, 140, 0xef4444, 0.6, true);
+
+    useGameStore.getState().showNotification(
+      'BOSS ENRAGED!',
+      'Ancient Golem has awakened its magma core! Beware the Primal Quakes!',
+      'error'
+    );
+  }
+
+  private createLootBeam(x: number, y: number, color: number = 0xfbbf24) {
+    const beam = this.add.rectangle(x, y - 80, 24, 200, color, 0.6)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(290);
+
+    const innerCore = this.add.rectangle(x, y - 80, 10, 200, 0xffffff, 0.9)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(291);
+
+    this.lightingManager.addPointLight(x, y, 120, color, 0.7, true);
+
+    this.tweens.add({
+      targets: [beam, innerCore],
+      alpha: 0.3,
+      scaleX: 1.4,
+      duration: 600,
+      yoyo: true,
+      repeat: 3,
+      onComplete: () => {
+        this.tweens.add({
+          targets: [beam, innerCore],
+          alpha: 0,
+          scaleY: 0.1,
+          duration: 500,
+          onComplete: () => {
+            beam.destroy();
+            innerCore.destroy();
+          },
+        });
+      },
+    });
+  }
+
   private enemyAttackPlayer(enemy: DungeonEnemy) {
     if (this.isDodgeInvulnerable || sandboxManager.getConfig().godMode) return;
 
     if (enemy.isBoss) {
-      // Boss Telegraphed Attack: Ground Slam!
       soundManager.playSfx('boss_roar');
-      const slamIndicator = this.add.circle(this.player.x, this.player.y, 48, 0xef4444, 0.4).setDepth(200);
 
-      this.time.delayedCall(500, () => {
-        slamIndicator.destroy();
-        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, slamIndicator.x, slamIndicator.y);
-        if (dist < 48 && !this.isDodgeInvulnerable) {
-          const gameStore = useGameStore.getState();
-          const dmg = calculateDamage(enemy.attack * 1.3, gameStore.stats.defense);
-          const nextHp = Math.max(0, gameStore.stats.hp - dmg.finalDamage);
-          gameStore.setPlayerStats({ ...gameStore.stats, hp: nextHp });
-          this.cameras.main.shake(200, 0.015);
-          soundManager.playSfx('hit');
+      if (enemy.isEnraged) {
+        // Enraged Primal Quake: 3 concentric expanding shockwave ripples
+        const targetX = this.player.x;
+        const targetY = this.player.y;
 
-          if (nextHp <= 0) {
-            useGameStore.getState().openModal('gameover');
+        const warningCircle = this.add.circle(targetX, targetY, 64, 0xef4444, 0.45).setDepth(200);
+        this.tweens.add({
+          targets: warningCircle,
+          alpha: 0.1,
+          duration: 180,
+          yoyo: true,
+          repeat: 2,
+        });
+
+        this.time.delayedCall(550, () => {
+          warningCircle.destroy();
+
+          [40, 75, 110].forEach((radius, idx) => {
+            this.time.delayedCall(idx * 160, () => {
+              const shockwave = this.add.circle(targetX, targetY, radius, 0xff7733, 0.5)
+                .setStrokeStyle(3, 0xffeedd)
+                .setDepth(210);
+
+              this.tweens.add({
+                targets: shockwave,
+                scaleX: 1.25,
+                scaleY: 1.25,
+                alpha: 0,
+                duration: 350,
+                onComplete: () => shockwave.destroy(),
+              });
+
+              const currentDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, targetX, targetY);
+              if (currentDist <= radius + 15 && !this.isDodgeInvulnerable && !sandboxManager.getConfig().godMode) {
+                const gameStore = useGameStore.getState();
+                const dmg = calculateDamage(enemy.attack * 1.5, gameStore.stats.defense);
+                const nextHp = Math.max(0, gameStore.stats.hp - dmg.finalDamage);
+                gameStore.setPlayerStats({ ...gameStore.stats, hp: nextHp });
+                this.cameras.main.shake(250, 0.02);
+                soundManager.playSfx('hit');
+
+                if (nextHp <= 0) {
+                  useGameStore.getState().openModal('gameover');
+                }
+              }
+            });
+          });
+        });
+      } else {
+        // Normal Boss Ground Slam
+        const slamIndicator = this.add.circle(this.player.x, this.player.y, 48, 0xef4444, 0.4).setDepth(200);
+
+        this.time.delayedCall(500, () => {
+          slamIndicator.destroy();
+          const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, slamIndicator.x, slamIndicator.y);
+          if (dist < 48 && !this.isDodgeInvulnerable) {
+            const gameStore = useGameStore.getState();
+            const dmg = calculateDamage(enemy.attack * 1.3, gameStore.stats.defense);
+            const nextHp = Math.max(0, gameStore.stats.hp - dmg.finalDamage);
+            gameStore.setPlayerStats({ ...gameStore.stats, hp: nextHp });
+            this.cameras.main.shake(200, 0.015);
+            soundManager.playSfx('hit');
+
+            if (nextHp <= 0) {
+              useGameStore.getState().openModal('gameover');
+            }
           }
-        }
-      });
+        });
+      }
     } else {
       const gameStore = useGameStore.getState();
       const dmg = calculateDamage(enemy.attack, gameStore.stats.defense);
@@ -769,6 +1017,10 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private returnToVillage() {
+    if (this.bossDefeatedThisRun) {
+      useGameStore.getState().incrementDungeonsCleared();
+    }
+    useGameStore.getState().setDungeonBlessing(null);
     soundManager.playSfx('crystal');
     useGameStore.getState().showNotification('RETURNED SAFELY', 'Back in Everlight Village.', 'info');
     this.scene.start('WorldScene');

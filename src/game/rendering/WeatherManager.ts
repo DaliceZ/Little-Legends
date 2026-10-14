@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { useGameStore } from '../../app/store/useGameStore';
 
 export type WeatherType = 'clear' | 'fireflies' | 'leaves' | 'rain' | 'mist' | 'embers';
 
@@ -24,10 +25,14 @@ export class WeatherManager {
   }
 
   update(_time: number, delta: number) {
-    if (this.quality === 'low') return;
+    const userSettings = useGameStore.getState().settings;
+    if (userSettings?.reducedMotion || userSettings?.graphicsQuality === 'low' || this.quality === 'low') {
+      return;
+    }
 
     this.spawnTimer += delta;
-    const interval = this.quality === 'ultra' ? 80 : this.quality === 'high' ? 140 : 250;
+    const effectiveQuality = userSettings?.graphicsQuality || this.quality;
+    const interval = effectiveQuality === 'high' ? 140 : 260;
 
     if (this.spawnTimer >= interval) {
       this.spawnTimer = 0;
