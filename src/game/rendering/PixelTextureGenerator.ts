@@ -70,29 +70,122 @@ export class PixelTextureGenerator {
       scene.textures.addCanvas('tile_stone', canvas);
     }
 
-    // Dungeon Floor Tile (32x32)
+    // Dungeon Floor Tile (Standard) (32x32)
     {
       const { canvas, ctx } = this.createCanvas(32, 32);
       ctx.fillStyle = '#1e2330';
       ctx.fillRect(0, 0, 32, 32);
-      // Stone grid lines
       ctx.fillStyle = '#141824';
       ctx.fillRect(0, 0, 32, 1);
       ctx.fillRect(0, 0, 1, 32);
       ctx.fillRect(0, 31, 32, 1);
       ctx.fillRect(31, 0, 1, 32);
-      // Cracks and specks
       ctx.fillStyle = '#2c3448';
       ctx.fillRect(6, 8, 4, 2);
       ctx.fillRect(10, 10, 6, 2);
       ctx.fillRect(20, 20, 5, 2);
-      // Ancient rune glow speck
       ctx.fillStyle = '#0ea5e9';
       ctx.fillRect(22, 12, 2, 2);
       scene.textures.addCanvas('tile_dungeon_floor', canvas);
     }
 
-    // Dungeon Wall Tile (32x32)
+    // Dungeon Floor Tile: Clean Stone Slab
+    {
+      const { canvas, ctx } = this.createCanvas(32, 32);
+      ctx.fillStyle = '#222838';
+      ctx.fillRect(0, 0, 32, 32);
+      ctx.fillStyle = '#171c28';
+      ctx.fillRect(0, 0, 32, 1);
+      ctx.fillRect(0, 0, 1, 32);
+      ctx.fillStyle = '#2d3549';
+      ctx.fillRect(1, 1, 30, 1);
+      ctx.fillRect(1, 1, 1, 30);
+      scene.textures.addCanvas('tile_dungeon_floor_clean', canvas);
+    }
+
+    // Dungeon Floor Tile: Cracked Stone
+    {
+      const { canvas, ctx } = this.createCanvas(32, 32);
+      ctx.fillStyle = '#1e2330';
+      ctx.fillRect(0, 0, 32, 32);
+      ctx.fillStyle = '#141824';
+      ctx.fillRect(0, 0, 32, 1);
+      ctx.fillRect(0, 0, 1, 32);
+      // Fissure cracks
+      ctx.fillStyle = '#090b10';
+      ctx.fillRect(5, 4, 2, 6);
+      ctx.fillRect(7, 9, 4, 2);
+      ctx.fillRect(11, 10, 2, 7);
+      ctx.fillRect(13, 16, 6, 2);
+      ctx.fillRect(18, 17, 2, 8);
+      // Highlights on crack edge
+      ctx.fillStyle = '#333e54';
+      ctx.fillRect(6, 3, 2, 1);
+      ctx.fillRect(12, 9, 2, 1);
+      scene.textures.addCanvas('tile_dungeon_floor_cracked', canvas);
+    }
+
+    // Dungeon Floor Tile: Ancient Arcane Rune
+    {
+      const { canvas, ctx } = this.createCanvas(32, 32);
+      ctx.fillStyle = '#1a202c';
+      ctx.fillRect(0, 0, 32, 32);
+      ctx.fillStyle = '#121620';
+      ctx.fillRect(0, 0, 32, 1);
+      ctx.fillRect(0, 0, 1, 32);
+      // Glowing concentric rune circle
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(16, 16, 9, 0, Math.PI * 2);
+      ctx.stroke();
+      // Glowing rune core
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(15, 15, 2, 2);
+      ctx.fillRect(16, 9, 1, 3);
+      ctx.fillRect(16, 20, 1, 3);
+      ctx.fillRect(9, 16, 3, 1);
+      ctx.fillRect(20, 16, 3, 1);
+      scene.textures.addCanvas('tile_dungeon_floor_rune', canvas);
+    }
+
+    // Dungeon Floor Tile: Mossy Lichen
+    {
+      const { canvas, ctx } = this.createCanvas(32, 32);
+      ctx.fillStyle = '#1c222e';
+      ctx.fillRect(0, 0, 32, 32);
+      ctx.fillStyle = '#121620';
+      ctx.fillRect(0, 0, 32, 1);
+      ctx.fillRect(0, 0, 1, 32);
+      // Damp moss patches
+      ctx.fillStyle = '#14532d';
+      ctx.fillRect(4, 6, 8, 7);
+      ctx.fillRect(18, 16, 10, 8);
+      ctx.fillStyle = '#16a34a';
+      ctx.fillRect(6, 7, 4, 4);
+      ctx.fillRect(20, 18, 5, 4);
+      scene.textures.addCanvas('tile_dungeon_floor_moss', canvas);
+    }
+
+    // Dungeon Floor Tile: Dark Water Puddle
+    {
+      const { canvas, ctx } = this.createCanvas(32, 32);
+      ctx.fillStyle = '#1e2330';
+      ctx.fillRect(0, 0, 32, 32);
+      ctx.fillStyle = '#0f172a';
+      // Puddle body
+      ctx.fillStyle = '#075985';
+      ctx.beginPath();
+      ctx.ellipse(16, 16, 10, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Reflection highlight
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(13, 14, 5, 1);
+      ctx.fillRect(17, 16, 3, 1);
+      scene.textures.addCanvas('tile_dungeon_floor_puddle', canvas);
+    }
+
+    // Dungeon Wall Tile (Standard) (32x32)
     {
       const { canvas, ctx } = this.createCanvas(32, 32);
       ctx.fillStyle = '#0d111a';
@@ -108,6 +201,46 @@ export class PixelTextureGenerator {
       ctx.fillStyle = '#0284c7';
       ctx.fillRect(15, 7, 2, 2);
       scene.textures.addCanvas('tile_dungeon_wall', canvas);
+    }
+
+    // Dungeon Wall Tile: Cracked Wall
+    {
+      const { canvas, ctx } = this.createCanvas(32, 32);
+      ctx.fillStyle = '#0a0d14';
+      ctx.fillRect(0, 0, 32, 32);
+      ctx.fillStyle = '#181e2c';
+      ctx.fillRect(2, 2, 28, 12);
+      ctx.fillRect(2, 16, 13, 13);
+      ctx.fillRect(17, 16, 13, 13);
+      // Heavy stone fracture
+      ctx.fillStyle = '#05060a';
+      ctx.fillRect(8, 4, 2, 16);
+      ctx.fillRect(10, 12, 6, 2);
+      ctx.fillRect(16, 14, 2, 10);
+      scene.textures.addCanvas('tile_dungeon_wall_cracked', canvas);
+    }
+
+    // Dungeon Wall Tile: Wall Mounted Torch
+    {
+      const { canvas, ctx } = this.createCanvas(32, 32);
+      ctx.fillStyle = '#0d111a';
+      ctx.fillRect(0, 0, 32, 32);
+      ctx.fillStyle = '#1e2436';
+      ctx.fillRect(2, 2, 28, 12);
+      ctx.fillRect(2, 16, 13, 13);
+      ctx.fillRect(17, 16, 13, 13);
+      // Iron sconce bracket
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(14, 14, 4, 8);
+      ctx.fillRect(12, 12, 8, 3);
+      // Torch wood & flame
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(15, 10, 2, 6);
+      ctx.fillStyle = '#ea580c';
+      ctx.fillRect(14, 5, 4, 5);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(15, 6, 2, 3);
+      scene.textures.addCanvas('tile_dungeon_wall_torch', canvas);
     }
 
     // Water Tile (32x32)
@@ -740,6 +873,129 @@ export class PixelTextureGenerator {
       ctx.arc(24, 22, 10, 0, Math.PI * 2);
       ctx.fill();
       scene.textures.addCanvas('prop_tree', canvas);
+    }
+
+    // Light Disc for Dynamic Radial Lighting (128x128)
+    {
+      const { canvas, ctx } = this.createCanvas(128, 128);
+      const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.35, 'rgba(255, 255, 255, 0.65)');
+      grad.addColorStop(0.7, 'rgba(255, 255, 255, 0.18)');
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      scene.textures.addCanvas('vfx_light_disc', canvas);
+    }
+
+    // Dungeon Brazier (Standing Lit Torch) (24x32)
+    {
+      const { canvas, ctx } = this.createCanvas(24, 32);
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(12, 30, 8, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Iron Stand
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(8, 26, 8, 4); // base
+      ctx.fillRect(11, 14, 2, 12); // pole
+      ctx.fillRect(7, 10, 10, 5); // iron bowl
+      // Hot coals
+      ctx.fillStyle = '#ea580c';
+      ctx.fillRect(8, 9, 8, 3);
+      // Flame core
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.moveTo(12, 1);
+      ctx.lineTo(16, 9);
+      ctx.lineTo(8, 9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(11, 4, 2, 4);
+      scene.textures.addCanvas('prop_brazier_lit', canvas);
+    }
+
+    // Dungeon Stone Pillar (32x48)
+    {
+      const { canvas, ctx } = this.createCanvas(32, 48);
+      // Base
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(4, 40, 24, 8);
+      ctx.fillStyle = '#1f2937';
+      ctx.fillRect(6, 38, 20, 2);
+      // Column shaft
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(8, 8, 16, 30);
+      // Fluted highlights
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(9, 8, 3, 30);
+      ctx.fillRect(15, 8, 3, 30);
+      ctx.fillRect(20, 8, 3, 30);
+      // Capital top
+      ctx.fillStyle = '#1f2937';
+      ctx.fillRect(6, 6, 20, 2);
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(4, 2, 24, 4);
+      scene.textures.addCanvas('prop_dungeon_pillar', canvas);
+    }
+
+    // Dungeon Floor Bones & Skull Decal (24x24)
+    {
+      const { canvas, ctx } = this.createCanvas(24, 24);
+      ctx.fillStyle = '#94a3b8';
+      // Skull
+      ctx.beginPath();
+      ctx.arc(8, 10, 4, 0, Math.PI * 2);
+      ctx.fill();
+      // Eye sockets
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(7, 10, 1, 1);
+      ctx.fillRect(9, 10, 1, 1);
+      // Scattered ribs / femurs
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(14, 12, 8, 2);
+      ctx.fillRect(12, 16, 7, 2);
+      ctx.fillRect(4, 17, 6, 2);
+      scene.textures.addCanvas('prop_dungeon_bones', canvas);
+    }
+
+    // Dungeon Chains (16x32)
+    {
+      const { canvas, ctx } = this.createCanvas(16, 32);
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(6, 0, 4, 4); // mount ring
+      for (let y = 4; y < 28; y += 6) {
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(6, y, 4, 5);
+      }
+      scene.textures.addCanvas('prop_dungeon_chains', canvas);
+    }
+
+    // Dungeon Arcane Altar (32x32)
+    {
+      const { canvas, ctx } = this.createCanvas(32, 32);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(2, 20, 28, 12);
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(4, 8, 24, 12);
+      // Runic carved glyphs
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(8, 12, 4, 4);
+      ctx.fillRect(14, 10, 4, 6);
+      ctx.fillRect(20, 12, 4, 4);
+      // Glowing crystal shard in center
+      ctx.fillStyle = '#0ea5e9';
+      ctx.beginPath();
+      ctx.moveTo(16, 2);
+      ctx.lineTo(20, 8);
+      ctx.lineTo(16, 12);
+      ctx.lineTo(12, 8);
+      ctx.closePath();
+      ctx.fill();
+      scene.textures.addCanvas('prop_dungeon_altar', canvas);
     }
   }
 }

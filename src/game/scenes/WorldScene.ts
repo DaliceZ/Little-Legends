@@ -51,6 +51,7 @@ export class WorldScene extends Phaser.Scene {
 
   private lastAttackTime: number = 0;
   private staminaRegenTimer: number = 0;
+  private playerShadow!: Phaser.GameObjects.Ellipse;
   private numKeys: { [key: number]: Phaser.Input.Keyboard.Key } = {};
   private petCompanion: PetCompanion | null = null;
   private currentActivePetId: string | null = null;
@@ -117,10 +118,12 @@ export class WorldScene extends Phaser.Scene {
     // 2. Spawn Interactive NPCs
     this.spawnNPCs();
 
-    // 3. Spawn Kael (Player)
+    // 3. Spawn Kael (Player) with grounded shadow
+    this.playerShadow = this.add.ellipse(480, 538, 22, 9, 0x000000, 0.4).setDepth(20);
     this.player = this.physics.add.sprite(480, 520, 'kael_idle_down');
     this.player.setSize(18, 16).setOffset(12, 30);
     this.player.setCollideWorldBounds(true);
+    this.player.setDepth(25);
 
     // Collisions
     this.physics.add.collider(this.player, buildings);
@@ -313,6 +316,11 @@ export class WorldScene extends Phaser.Scene {
     if (isPaused) {
       this.player.setVelocity(0, 0);
       return;
+    }
+
+    // Sync player drop shadow position
+    if (this.playerShadow && this.player && this.player.active) {
+      this.playerShadow.setPosition(this.player.x, this.player.y + 18);
     }
 
     // Handle Player Input & Movement

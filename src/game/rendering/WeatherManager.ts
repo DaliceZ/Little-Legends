@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-export type WeatherType = 'clear' | 'fireflies' | 'leaves' | 'rain' | 'mist';
+export type WeatherType = 'clear' | 'fireflies' | 'leaves' | 'rain' | 'mist' | 'embers';
 
 export class WeatherManager {
   private particles: Phaser.GameObjects.Arc[] = [];
@@ -89,6 +89,39 @@ export class WeatherManager {
         y: startY + 220,
         duration: 400,
         onComplete: () => drop.destroy(),
+      });
+    } else if (this.currentWeather === 'mist') {
+      // Atmospheric floating dungeon dust motes and glowing blue spores
+      const isSpore = Math.random() > 0.65;
+      const color = isSpore ? 0x38bdf8 : 0x94a3b8;
+      const size = isSpore ? 2 : 1.5;
+      const alpha = isSpore ? 0.65 : 0.35;
+      const mote = this.scene.add.circle(startX, startY, size, color, alpha).setDepth(280);
+      this.particles.push(mote);
+
+      this.scene.tweens.add({
+        targets: mote,
+        x: startX + (Math.random() * 60 - 30),
+        y: startY - (Math.random() * 50 + 20),
+        alpha: 0,
+        duration: 3000 + Math.random() * 2000,
+        ease: 'Sine.easeOut',
+        onComplete: () => mote.destroy(),
+      });
+    } else if (this.currentWeather === 'embers') {
+      // Fiery glowing sparks near dungeon braziers
+      const color = Math.random() > 0.4 ? 0xf97316 : 0xef4444;
+      const ember = this.scene.add.circle(startX, startY, 1.5, color, 0.85).setDepth(285);
+      this.particles.push(ember);
+
+      this.scene.tweens.add({
+        targets: ember,
+        x: startX + (Math.random() * 30 - 15),
+        y: startY - (Math.random() * 70 + 40),
+        alpha: 0,
+        duration: 1800 + Math.random() * 1000,
+        ease: 'Quad.easeOut',
+        onComplete: () => ember.destroy(),
       });
     }
   }

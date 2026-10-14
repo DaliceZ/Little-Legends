@@ -51,6 +51,7 @@ export class DungeonScene extends Phaser.Scene {
   private enemies: DungeonEnemy[] = [];
   private chests: DungeonChest[] = [];
   private wallsGroup!: Phaser.Physics.Arcade.StaticGroup;
+  private playerShadow!: Phaser.GameObjects.Ellipse;
 
   private lightingManager!: LightingManager;
   private weatherManager!: WeatherManager;
@@ -78,7 +79,12 @@ export class DungeonScene extends Phaser.Scene {
 
     this.wallsGroup = this.physics.add.staticGroup();
 
-    // Render Tiles
+    // 1. Initialize Lighting & Atmospheric Dust Systems
+    this.lightingManager = new LightingManager(this, true);
+    this.weatherManager = new WeatherManager(this, true);
+    this.weatherManager.setWeather('mist');
+
+    // 2. Render Tiles with Visual Diversity
     for (let y = 0; y < this.dungeonMap.height; y++) {
       for (let x = 0; x < this.dungeonMap.width; x++) {
         const tileType = this.dungeonMap.tiles[y][x];
@@ -86,32 +92,58 @@ export class DungeonScene extends Phaser.Scene {
         const py = y * tileSize + 16;
 
         if (tileType === 1) {
-          // Walkable Floor
-          this.add.image(px, py, 'tile_dungeon_floor');
+          // Walkable Floor Variants (clean, cracked, mossy, puddles)
+          const hash = (x * 37 + y * 19) % 100;
+          let floorKey = 'tile_dungeon_floor';
+          if (hash < 12) floorKey = 'tile_dungeon_floor_clean';
+          else if (hash < 24) floorKey = 'tile_dungeon_floor_cracked';
+          else if (hash < 32) floorKey = 'tile_dungeon_floor_moss';
+          else if (hash < 38) floorKey = 'tile_dungeon_floor_puddle';
+          this.add.image(px, py, floorKey);
         } else if (tileType === 2) {
-          // Solid Wall
-          this.add.image(px, py, 'tile_dungeon_wall');
+          // Solid Wall with Torch Sconces on South-Facing Walls
+          const isSouthFloor = y + 1 < this.dungeonMap.height && this.dungeonMap.tiles[y + 1][x] === 1;
+          const hash = (x * 31 + y * 17) % 100;
+          let wallKey = 'tile_dungeon_wall';
+
+          if (isSouthFloor && hash < 20) {
+            wallKey = 'tile_dungeon_wall_torch';
+            // Register an atmospheric wall torch point light
+            this.lightingManager.addPointLight(px, py + 8, 80, 0xf97316, 0.44, true);
+          } else if (hash > 80) {
+            wallKey = 'tile_dungeon_wall_cracked';
+          }
+
+          this.add.image(px, py, wallKey);
           const wall = this.wallsGroup.create(px, py, undefined);
           wall.setSize(32, 32).setVisible(false);
         } else if (tileType === 3) {
-          // Entrance
-          this.add.image(px, py, 'tile_dungeon_floor');
-          this.add.image(px, py, 'prop_crystal').setScale(0.8);
+          // Entrance Sanctuary
+          this.add.image(px, py, 'tile_dungeon_floor_rune');
+          this.add.image(px, py, 'prop_crystal').setScale(0.85);
+          this.lightingManager.addPointLight(px, py, 95, 0x38bdf8, 0.5, true);
         } else if (tileType === 4) {
           // Boss Exit Altar
-          this.add.image(px, py, 'tile_dungeon_floor');
-          this.add.image(px, py, 'prop_crystal').setScale(1.2);
+          this.add.image(px, py, 'tile_dungeon_floor_rune');
+          this.add.image(px, py, 'prop_dungeon_altar');
+          this.lightingManager.addPointLight(px, py, 130, 0xa855f7, 0.55, true);
         }
       }
     }
 
-    // Spawn Player at entrance
+    // 3. Spawn Player at entrance with Drop Shadow & Crystal Light
     const startX = this.dungeonMap.entrance.x * tileSize + 16;
     const startY = this.dungeonMap.entrance.y * tileSize + 16;
+
+    this.playerShadow = this.add.ellipse(startX, startY + 18, 22, 9, 0x000000, 0.45).setDepth(20);
     this.player = this.physics.add.sprite(startX, startY, 'kael_idle_down');
     this.player.setSize(18, 16).setOffset(12, 30);
     this.player.setCollideWorldBounds(true);
+    this.player.setDepth(25);
     this.physics.add.collider(this.player, this.wallsGroup);
+
+    // Attach player Echo crystal light aura
+    this.lightingManager.attachPlayerLight(this.player, 0x38bdf8, 110);
 
     // Setup Camera
     this.cameras.main.setBounds(0, 0, mapW, mapH);
@@ -121,7 +153,7 @@ export class DungeonScene extends Phaser.Scene {
     // Controls
     this.setupControls();
 
-    // Spawn Rooms Entities (Enemies, Chests)
+    // Spawn Rooms Entities (Braziers, Pillars, Bones, Enemies, Chests)
     this.spawnDungeonEntities(tileSize);
 
     // Exit portal overlap (returns to village)
@@ -141,10 +173,6 @@ export class DungeonScene extends Phaser.Scene {
       `Endless Echo Ruins (Tier ${this.tier})`,
       'info'
     );
-
-    // Lighting & Mist Weather Systems
-    this.lightingManager = new LightingManager(this, true);
-    this.weatherManager = new WeatherManager(this, true);
   }
 
   private setupControls() {
@@ -180,6 +208,44 @@ export class DungeonScene extends Phaser.Scene {
 
   private spawnDungeonEntities(tileSize: number) {
     for (const room of this.dungeonMap.rooms) {
+      const rx = room.rect.x * tileSize;
+      const ry = room.rect.y * tileSize;
+      const rw = room.rect.width * tileSize;
+
+      // 1. Decorative Floor Bone Remnants in combat rooms
+      if (room.type === 'combat') {
+        const boneX = rx + 48;
+        const boneY = ry + 48;
+        this.add.image(boneX, boneY, 'prop_dungeon_bones').setDepth(4);
+      }
+
+      // 2. Standing Lit Braziers in Treasure and Boss rooms
+      if (room.type === 'treasure' || room.type === 'boss') {
+        const b1X = rx + 32;
+        const b1Y = ry + 32;
+        const b2X = rx + rw - 32;
+        const b2Y = ry + 32;
+
+        this.add.image(b1X, b1Y, 'prop_brazier_lit').setDepth(b1Y);
+        this.lightingManager.addPointLight(b1X, b1Y - 8, 85, 0xf97316, 0.46, true);
+
+        this.add.image(b2X, b2Y, 'prop_brazier_lit').setDepth(b2Y);
+        this.lightingManager.addPointLight(b2X, b2Y - 8, 85, 0xf97316, 0.46, true);
+
+        // Center room arcane rune floor marking
+        this.add.image(room.center.x * tileSize + 16, room.center.y * tileSize + 16, 'tile_dungeon_floor_rune').setDepth(1);
+      }
+
+      // 3. Decorative Stone Pillars in large rooms
+      if (room.rect.width >= 10 && room.rect.height >= 10) {
+        const p1X = rx + 48;
+        const p1Y = ry + 48;
+        const p2X = rx + rw - 48;
+        const p2Y = ry + 48;
+        this.add.image(p1X, p1Y, 'prop_dungeon_pillar').setDepth(p1Y + 16);
+        this.add.image(p2X, p2Y, 'prop_dungeon_pillar').setDepth(p2Y + 16);
+      }
+
       // Spawn Chests
       if (room.chestSpawn) {
         const cx = room.chestSpawn.x * tileSize + 16;
@@ -237,6 +303,11 @@ export class DungeonScene extends Phaser.Scene {
     if (isPaused) {
       this.player.setVelocity(0, 0);
       return;
+    }
+
+    // Sync player drop shadow
+    if (this.playerShadow && this.player && this.player.active) {
+      this.playerShadow.setPosition(this.player.x, this.player.y + 18);
     }
 
     this.handlePlayerInput(time, delta);
