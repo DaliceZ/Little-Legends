@@ -24,7 +24,9 @@ export type ActiveModal =
   | 'crafting' 
   | 'settings' 
   | 'gameover' 
-  | 'pause';
+  | 'pause'
+  | 'sandbox'
+  | 'map';
 
 export interface NotificationToast {
   id: string;
@@ -39,6 +41,9 @@ interface GameState {
   notifications: NotificationToast[];
   currentZone: 'village' | 'forest' | 'dungeon';
   dungeonTier: number;
+  isSandbox: boolean;
+  hotbar: string[];
+  kaelPortrait: string;
   
   // Player Progression
   level: number;
@@ -63,6 +68,9 @@ interface GameState {
   showNotification: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'loot') => void;
   removeNotification: (id: string) => void;
   setZone: (zone: 'village' | 'forest' | 'dungeon', tier?: number) => void;
+  setIsSandbox: (isSandbox: boolean) => void;
+  setKaelPortrait: (url: string) => void;
+  setHotbarSkill: (slotIndex: number, skillId: string) => void;
 
   setPlayerStats: (stats: CharacterStats) => void;
   setQuests: (quests: QuestState[]) => void;
@@ -92,6 +100,16 @@ export const useGameStore = create<GameState>((set, get) => ({
   notifications: [],
   currentZone: 'village',
   dungeonTier: 1,
+  isSandbox: false,
+  hotbar: [
+    'skill_bd_quick_slash',
+    'skill_bd_crescent',
+    'skill_bd_dash_strike',
+    'skill_bd_blade_storm',
+    'skill_bd_phantom_cut',
+    'skill_bd_ultimate',
+  ],
+  kaelPortrait: '',
 
   level: 1,
   exp: 0,
@@ -181,6 +199,22 @@ export const useGameStore = create<GameState>((set, get) => ({
       soundManager.playMusic('village');
     } else {
       soundManager.playMusic('dungeon');
+    }
+  },
+
+  setIsSandbox: (isSandbox) => {
+    set({ isSandbox });
+  },
+
+  setKaelPortrait: (url) => {
+    set({ kaelPortrait: url });
+  },
+
+  setHotbarSkill: (slotIndex, skillId) => {
+    const cur = [...get().hotbar];
+    if (slotIndex >= 0 && slotIndex < cur.length) {
+      cur[slotIndex] = skillId;
+      set({ hotbar: cur });
     }
   },
 

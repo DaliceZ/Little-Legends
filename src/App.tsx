@@ -12,6 +12,7 @@ import { DialogueBox } from './app/modals/DialogueBox';
 import { SettingsModal } from './app/modals/SettingsModal';
 import { GameOverModal } from './app/modals/GameOverModal';
 import { MainMenuModal } from './app/modals/MainMenuModal';
+import { SandboxPanel } from './app/modals/SandboxPanel';
 import { saveService } from './persistence/saveService';
 import { soundManager } from './shared/utils/soundSynthesizer';
 
@@ -70,6 +71,10 @@ export const App: React.FC = () => {
       } else if (e.key === 'q' || e.key === 'Q') {
         if (activeModal === 'quests') closeModal();
         else openModal('quests');
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        if (activeModal === 'sandbox') closeModal();
+        else openModal('sandbox');
       }
     };
 
@@ -116,6 +121,7 @@ export const App: React.FC = () => {
       {activeModal === 'crafting' && <CraftingModal />}
       {activeModal === 'settings' && <SettingsModal />}
       {activeModal === 'gameover' && <GameOverModal onRespawn={handleRespawn} />}
+      {activeModal === 'sandbox' && <SandboxPanel />}
     </div>
   );
 };

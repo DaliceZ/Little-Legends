@@ -4,6 +4,11 @@ import { useGameStore } from '../../app/store/useGameStore';
 import { calculateDamage } from '../../features/combat/combatCalculations';
 import { soundManager } from '../../shared/utils/soundSynthesizer';
 import { QuestManager } from '../../features/quests/questManager';
+import { LightingManager } from '../rendering/LightingManager';
+import { WeatherManager } from '../rendering/WeatherManager';
+import { VFXManager } from '../rendering/VFXManager';
+import { ALL_SKILLS_36 } from '../../features/skills/skillData';
+import { sandboxManager } from '../../features/sandbox/sandboxManager';
 
 interface DungeonEnemy {
   sprite: Phaser.Physics.Arcade.Sprite;
@@ -41,11 +46,15 @@ export class DungeonScene extends Phaser.Scene {
   private isDodging: boolean = false;
   private isDodgeInvulnerable: boolean = false;
   private lastAttackTime: number = 0;
-  private lastSkillTime: number = 0;
 
   private enemies: DungeonEnemy[] = [];
   private chests: DungeonChest[] = [];
   private wallsGroup!: Phaser.Physics.Arcade.StaticGroup;
+
+  private lightingManager!: LightingManager;
+  private weatherManager!: WeatherManager;
+  private numKeys: { [key: number]: Phaser.Input.Keyboard.Key } = {};
+  private skillCooldowns: Map<string, number> = new Map();
 
   constructor() {
     super({ key: 'DungeonScene' });
@@ -98,7 +107,7 @@ export class DungeonScene extends Phaser.Scene {
     const startX = this.dungeonMap.entrance.x * tileSize + 16;
     const startY = this.dungeonMap.entrance.y * tileSize + 16;
     this.player = this.physics.add.sprite(startX, startY, 'kael_idle_down');
-    this.player.setSize(18, 16).setOffset(7, 24);
+    this.player.setSize(18, 16).setOffset(12, 30);
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.wallsGroup);
 
@@ -130,6 +139,10 @@ export class DungeonScene extends Phaser.Scene {
       `Endless Echo Ruins (Tier ${this.tier})`,
       'info'
     );
+
+    // Lighting & Mist Weather Systems
+    this.lightingManager = new LightingManager(this, true);
+    this.weatherManager = new WeatherManager(this, true);
   }
 
   private setupControls() {
@@ -146,6 +159,15 @@ export class DungeonScene extends Phaser.Scene {
     this.skillKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.K);
     this.sprintKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.dodgeKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+    this.numKeys = {
+      1: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
+      2: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
+      3: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
+      4: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
+      5: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
+      6: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
+    };
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (pointer.leftButtonDown()) {
@@ -218,6 +240,9 @@ export class DungeonScene extends Phaser.Scene {
     this.handlePlayerInput(time, delta);
     this.handleChestInteractions();
     this.updateEnemies(time, delta);
+
+    if (this.lightingManager) this.lightingManager.update(time, delta);
+    if (this.weatherManager) this.weatherManager.update(time, delta);
   }
 
   private handlePlayerInput(_time: number, _delta: number) {
@@ -266,8 +291,16 @@ export class DungeonScene extends Phaser.Scene {
       this.performAttack();
     } else if (Phaser.Input.Keyboard.JustDown(this.dodgeKey)) {
       this.performDodge();
-    } else if (Phaser.Input.Keyboard.JustDown(this.skillKey)) {
-      this.performSkill();
+    } else {
+      for (let i = 1; i <= 6; i++) {
+        if (this.numKeys[i] && Phaser.Input.Keyboard.JustDown(this.numKeys[i])) {
+          this.triggerHotbarSlot(i - 1);
+          break;
+        }
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.skillKey)) {
+        this.triggerHotbarSlot(0);
+      }
     }
   }
 
@@ -330,26 +363,158 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-  private hitEnemy(enemy: DungeonEnemy) {
+  private triggerHotbarSlot(slotIndex: number) {
+    const hotbar = useGameStore.getState().hotbar;
+    const skillId = hotbar[slotIndex];
+    if (!skillId) return;
+    this.performSkillById(skillId);
+  }
+
+  private performSkillById(skillId: string) {
     const gameStore = useGameStore.getState();
+    const skill = ALL_SKILLS_36[skillId];
+    if (!skill) return;
+
+    const now = this.time.now;
+    const sandboxCfg = sandboxManager.getConfig();
+
+    if (!sandboxCfg.zeroCooldowns && now < (this.skillCooldowns.get(skillId) || 0)) {
+      return;
+    }
+
+    if (!sandboxCfg.infiniteStamina && (skill.costSp || 0) > gameStore.stats.sp) {
+      gameStore.showNotification('LOW STAMINA', 'Not enough stamina!', 'warning');
+      return;
+    }
+    if (!sandboxCfg.infiniteMana && (skill.costMp || 0) > gameStore.stats.mp) {
+      gameStore.showNotification('LOW MANA', 'Not enough mana!', 'warning');
+      return;
+    }
+
+    if (!sandboxCfg.infiniteStamina && skill.costSp) {
+      gameStore.setPlayerStats({
+        ...gameStore.stats,
+        sp: Math.max(0, gameStore.stats.sp - skill.costSp),
+      });
+    }
+    if (!sandboxCfg.infiniteMana && skill.costMp) {
+      gameStore.setPlayerStats({
+        ...gameStore.stats,
+        mp: Math.max(0, gameStore.stats.mp - skill.costMp),
+      });
+    }
+
+    this.skillCooldowns.set(skillId, now + skill.cooldownMs);
+
+    let targetX = this.player.x;
+    let targetY = this.player.y;
+    let angle = 0;
+
+    if (this.currentDirection === 'right') {
+      targetX += 36;
+      angle = 0;
+    } else if (this.currentDirection === 'left') {
+      targetX -= 36;
+      angle = 180;
+    } else if (this.currentDirection === 'down') {
+      targetY += 36;
+      angle = 90;
+    } else {
+      targetY -= 36;
+      angle = -90;
+    }
+
+    soundManager.playSfx(skill.element as any || 'slash');
+    VFXManager.playEffect(this, (skill.element as any) || 'crystal', targetX, targetY, angle);
+
+    if (skill.id === 'skill_bd_phantom_cut') {
+      let nearest: DungeonEnemy | null = null;
+      let minDist = 300;
+      for (const e of this.enemies) {
+        if (e.hp > 0 && e.sprite.active) {
+          const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, e.sprite.x, e.sprite.y);
+          if (d < minDist) {
+            minDist = d;
+            nearest = e;
+          }
+        }
+      }
+      if (nearest) {
+        this.player.setPosition(nearest.sprite.x - 24, nearest.sprite.y);
+      }
+    } else if (skill.id === 'skill_fm_blink') {
+      const blinkDist = 110;
+      if (this.currentDirection === 'right') this.player.x += blinkDist;
+      else if (this.currentDirection === 'left') this.player.x -= blinkDist;
+      else if (this.currentDirection === 'down') this.player.y += blinkDist;
+      else if (this.currentDirection === 'up') this.player.y -= blinkDist;
+    }
+
+    if (skill.id === 'skill_gd_unbreakable_wall' || skill.id === 'skill_bd_dash_strike') {
+      this.isDodgeInvulnerable = true;
+      this.time.delayedCall(800, () => {
+        this.isDodgeInvulnerable = false;
+      });
+    }
+
+    const range = skill.range || 85;
+    this.enemies.forEach((enemy) => {
+      if (enemy.hp <= 0 || !enemy.sprite.active) return;
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.sprite.x, enemy.sprite.y);
+      if (dist <= range) {
+        this.hitEnemyWithSkill(enemy, skill);
+      }
+    });
+  }
+
+  private hitEnemyWithSkill(enemy: DungeonEnemy, skill: any) {
+    const gameStore = useGameStore.getState();
+    const sandboxCfg = sandboxManager.getConfig();
+
+    const effectiveAtk = Math.round(gameStore.stats.attack * skill.damageMultiplier);
     const dmg = calculateDamage(
-      gameStore.stats.attack,
+      effectiveAtk,
       enemy.defense,
-      gameStore.stats.critChance,
+      gameStore.stats.critChance + (skill.isUltimate ? 0.35 : 0),
       gameStore.stats.critDamage
     );
 
-    enemy.hp -= dmg.finalDamage;
+    if (!sandboxCfg.invulnerableEnemies) {
+      enemy.hp -= dmg.finalDamage;
+    }
+
     soundManager.playSfx('hit');
 
-    // Float damage number
+    let color = '#ffffff';
+    if (skill.element === 'fire') color = '#ef4444';
+    else if (skill.element === 'ice') color = '#38bdf8';
+    else if (skill.element === 'shadow') color = '#c084fc';
+    else if (skill.element === 'crystal') color = '#67e8f9';
+    else if (skill.element === 'earth') color = '#f59e0b';
+    else if (skill.element === 'wind') color = '#a7f3d0';
+
+    this.showFloatingDamage(enemy.sprite.x, enemy.sprite.y - 18, dmg.finalDamage, dmg.isCritical, color);
+
+    sandboxManager.recordDamage(skill.nameEn, enemy.type, dmg.finalDamage, dmg.isCritical, skill.element);
+
+    enemy.sprite.setTint(0xff5555);
+    this.time.delayedCall(160, () => {
+      if (enemy.sprite.active) enemy.sprite.clearTint();
+    });
+
+    if (enemy.hp <= 0 && !sandboxCfg.invulnerableEnemies) {
+      this.killEnemy(enemy);
+    }
+  }
+
+  private showFloatingDamage(x: number, y: number, amount: number, isCrit: boolean, color?: string) {
     const text = this.add.text(
-      enemy.sprite.x,
-      enemy.sprite.y - 18,
-      dmg.isCritical ? `CRIT! -${dmg.finalDamage}` : `-${dmg.finalDamage}`,
+      x,
+      y,
+      isCrit ? `CRIT! -${amount}` : `-${amount}`,
       {
-        fontSize: dmg.isCritical ? '15px' : '11px',
-        color: dmg.isCritical ? '#fbbf24' : '#ffffff',
+        fontSize: isCrit ? '15px' : '11px',
+        color: isCrit ? '#fbbf24' : (color || '#ffffff'),
         stroke: '#000000',
         strokeThickness: 3,
       }
@@ -357,18 +522,40 @@ export class DungeonScene extends Phaser.Scene {
 
     this.tweens.add({
       targets: text,
-      y: enemy.sprite.y - 40,
+      y: y - 24,
       alpha: 0,
       duration: 600,
       onComplete: () => text.destroy(),
     });
+  }
+
+  private hitEnemy(enemy: DungeonEnemy) {
+    const gameStore = useGameStore.getState();
+    const sandboxCfg = sandboxManager.getConfig();
+
+    const dmg = calculateDamage(
+      gameStore.stats.attack,
+      enemy.defense,
+      gameStore.stats.critChance,
+      gameStore.stats.critDamage
+    );
+
+    if (!sandboxCfg.invulnerableEnemies) {
+      enemy.hp -= dmg.finalDamage;
+    }
+
+    soundManager.playSfx('hit');
+
+    this.showFloatingDamage(enemy.sprite.x, enemy.sprite.y - 18, dmg.finalDamage, dmg.isCritical);
+
+    sandboxManager.recordDamage('Basic Slash', enemy.type, dmg.finalDamage, dmg.isCritical, 'physical');
 
     enemy.sprite.setTint(0xff5555);
     this.time.delayedCall(160, () => {
       if (enemy.sprite.active) enemy.sprite.clearTint();
     });
 
-    if (enemy.hp <= 0) {
+    if (enemy.hp <= 0 && !sandboxCfg.invulnerableEnemies) {
       this.killEnemy(enemy);
     }
   }
@@ -437,60 +624,6 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-  private performSkill() {
-    const gameStore = useGameStore.getState();
-    const now = this.time.now;
-    if (now - this.lastSkillTime < 2500) return;
-    this.lastSkillTime = now;
-
-    if (gameStore.specialization === 'blade_dancer') {
-      if (gameStore.stats.sp < 20) return;
-      gameStore.setPlayerStats({ ...gameStore.stats, sp: gameStore.stats.sp - 20 });
-      soundManager.playSfx('slash');
-
-      const ring = this.add.sprite(this.player.x, this.player.y, 'fx_whirlwind').setDepth(300);
-      this.tweens.add({
-        targets: ring,
-        scale: 1.8,
-        alpha: 0,
-        duration: 300,
-        onComplete: () => ring.destroy(),
-      });
-
-      this.enemies.forEach((enemy) => {
-        if (enemy.hp <= 0) return;
-        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.sprite.x, enemy.sprite.y);
-        if (dist < 80) this.hitEnemy(enemy);
-      });
-    } else {
-      if (gameStore.stats.mp < 20) return;
-      gameStore.setPlayerStats({ ...gameStore.stats, mp: gameStore.stats.mp - 20 });
-      soundManager.playSfx('crystal');
-
-      const beam = this.add.sprite(this.player.x, this.player.y, 'fx_crystal_beam').setDepth(300);
-      let angle = 0;
-      if (this.currentDirection === 'left') angle = 180;
-      else if (this.currentDirection === 'right') angle = 0;
-      else if (this.currentDirection === 'up') angle = -90;
-      else if (this.currentDirection === 'down') angle = 90;
-      beam.setAngle(angle);
-
-      this.tweens.add({
-        targets: beam,
-        scaleX: 3,
-        alpha: 0,
-        duration: 350,
-        onComplete: () => beam.destroy(),
-      });
-
-      this.enemies.forEach((enemy) => {
-        if (enemy.hp <= 0) return;
-        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.sprite.x, enemy.sprite.y);
-        if (dist < 160) this.hitEnemy(enemy);
-      });
-    }
-  }
-
   private handleChestInteractions() {
     for (const chest of this.chests) {
       if (chest.opened) continue;
@@ -511,6 +644,13 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private updateEnemies(_time: number, delta: number) {
+    if (sandboxManager.getConfig().disableEnemyAI) {
+      this.enemies.forEach((enemy) => {
+        if (enemy.sprite.active) enemy.sprite.setVelocity(0, 0);
+      });
+      return;
+    }
+
     this.enemies.forEach((enemy) => {
       if (enemy.hp <= 0 || !enemy.sprite.active) return;
 
@@ -544,7 +684,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private enemyAttackPlayer(enemy: DungeonEnemy) {
-    if (this.isDodgeInvulnerable) return;
+    if (this.isDodgeInvulnerable || sandboxManager.getConfig().godMode) return;
 
     if (enemy.isBoss) {
       // Boss Telegraphed Attack: Ground Slam!

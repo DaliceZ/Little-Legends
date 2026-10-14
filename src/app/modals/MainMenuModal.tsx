@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { saveService } from '../../persistence/saveService';
 import { t } from '../../shared/localization';
-import { Play, Sparkles, Settings as SettingsIcon, Globe } from 'lucide-react';
+import { Play, Sparkles, Settings as SettingsIcon, Globe, Wrench } from 'lucide-react';
 import { soundManager } from '../../shared/utils/soundSynthesizer';
 
 interface MainMenuModalProps {
@@ -10,7 +10,7 @@ interface MainMenuModalProps {
 }
 
 export const MainMenuModal: React.FC<MainMenuModalProps> = ({ onStartGame }) => {
-  const { settings, setSettings, openModal, loadSavedGame } = useGameStore();
+  const { settings, setSettings, openModal, loadSavedGame, setIsSandbox } = useGameStore();
   const [hasSave, setHasSave] = useState(false);
   const lang = settings.language;
 
@@ -28,6 +28,13 @@ export const MainMenuModal: React.FC<MainMenuModalProps> = ({ onStartGame }) => 
 
   const handleNewGame = () => {
     soundManager.playSfx('crystal');
+    setIsSandbox(false);
+    onStartGame();
+  };
+
+  const handleSandboxMode = () => {
+    soundManager.playSfx('levelup');
+    setIsSandbox(true);
     onStartGame();
   };
 
@@ -70,6 +77,14 @@ export const MainMenuModal: React.FC<MainMenuModalProps> = ({ onStartGame }) => 
           >
             <Play size={16} />
             <span>{t('newGame', lang)}</span>
+          </button>
+
+          <button
+            onClick={handleSandboxMode}
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold py-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-xl transition-all transform active:scale-95 border border-indigo-400/30"
+          >
+            <Wrench size={16} />
+            <span>{lang === 'th' ? 'โหมดแซนด์บ็อกซ์ / ทดสอบ' : 'Sandbox / Creative Mode'}</span>
           </button>
 
           <button

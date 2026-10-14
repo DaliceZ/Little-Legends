@@ -71,7 +71,15 @@ export interface ItemInstance {
   affixes: ItemAffix[];
 }
 
-export type Specialization = 'blade_dancer' | 'guardian' | 'echo_mage';
+export type Specialization = 
+  | 'blade_dancer' 
+  | 'guardian' 
+  | 'fire_mage' 
+  | 'frost_mage' 
+  | 'shadow_assassin' 
+  | 'echo_mage';
+
+export type ElementType = 'physical' | 'fire' | 'ice' | 'lightning' | 'wind' | 'shadow' | 'crystal';
 
 export interface SkillNode {
   id: string;
@@ -88,6 +96,11 @@ export interface SkillNode {
   cooldownMs: number;
   icon: string;
   isActive: boolean; // active skill vs passive
+  isUltimate?: boolean;
+  element?: ElementType;
+  damageMultiplier?: number;
+  range?: number;
+  prerequisites?: string[];
   statBonuses?: Partial<CharacterStats>;
 }
 

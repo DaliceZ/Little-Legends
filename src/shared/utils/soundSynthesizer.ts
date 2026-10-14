@@ -34,7 +34,7 @@ class SoundSynthesizer {
   }
 
   // Play standard retro sound effects
-  playSfx(type: 'slash' | 'hit' | 'dodge' | 'pickup' | 'levelup' | 'quest' | 'click' | 'potion' | 'boss_roar' | 'crystal') {
+  playSfx(type: 'slash' | 'hit' | 'dodge' | 'pickup' | 'levelup' | 'quest' | 'click' | 'potion' | 'boss_roar' | 'crystal' | 'fire' | 'ice' | 'shadow' | 'lightning' | 'earth' | 'ultimate') {
     if (this.isMuted || this.masterVol <= 0 || this.sfxVol <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
@@ -197,6 +197,100 @@ class SoundSynthesizer {
         osc.connect(gainNode);
         osc.start(now);
         osc.stop(now + 0.8);
+        break;
+      }
+      case 'fire': {
+        const osc = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(250, now);
+        osc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, now);
+        filter.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+
+        gainNode.gain.setValueAtTime(netVolume * 1.1, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+        osc.connect(filter);
+        filter.connect(gainNode);
+        osc.start(now);
+        osc.stop(now + 0.3);
+        break;
+      }
+      case 'ice': {
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.25);
+
+        gainNode.gain.setValueAtTime(netVolume * 0.8, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+        osc.connect(gainNode);
+        osc.start(now);
+        osc.stop(now + 0.25);
+        break;
+      }
+      case 'shadow': {
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.linearRampToValueAtTime(40, now + 0.35);
+
+        gainNode.gain.setValueAtTime(netVolume * 0.9, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+        osc.connect(gainNode);
+        osc.start(now);
+        osc.stop(now + 0.35);
+        break;
+      }
+      case 'lightning': {
+        const osc = this.ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.setValueAtTime(1600, now + 0.05);
+        osc.frequency.setValueAtTime(400, now + 0.1);
+
+        gainNode.gain.setValueAtTime(netVolume * 0.7, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        osc.connect(gainNode);
+        osc.start(now);
+        osc.stop(now + 0.18);
+        break;
+      }
+      case 'earth': {
+        const osc = this.ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(95, now);
+        osc.frequency.linearRampToValueAtTime(30, now + 0.4);
+
+        gainNode.gain.setValueAtTime(netVolume * 1.4, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+        osc.connect(gainNode);
+        osc.start(now);
+        osc.stop(now + 0.4);
+        break;
+      }
+      case 'ultimate': {
+        const chord = [220, 277.18, 329.63, 440];
+        chord.forEach((freq, idx) => {
+          const osc = this.ctx!.createOscillator();
+          const noteGain = this.ctx!.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.value = freq;
+          const startTime = now + idx * 0.06;
+          noteGain.gain.setValueAtTime(netVolume * 0.9, startTime);
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.7);
+          osc.connect(noteGain);
+          noteGain.connect(gainNode);
+          osc.start(startTime);
+          osc.stop(startTime + 0.75);
+        });
         break;
       }
     }

@@ -15,7 +15,8 @@ export const CharacterModal: React.FC = () => {
     unequipItem, 
     specialization, 
     closeModal, 
-    settings 
+    settings,
+    kaelPortrait,
   } = useGameStore();
 
   const lang = settings.language;
@@ -47,14 +48,23 @@ export const CharacterModal: React.FC = () => {
           <div className="flex flex-col gap-4">
             {/* Identity Card */}
             <div className="bg-fantasy-panel border border-fantasy-border p-4 rounded-xl flex items-center gap-4">
-              <div className="w-16 h-16 rounded-xl bg-fantasy-darkest border-2 border-fantasy-crystal flex items-center justify-center text-3xl shadow-inner">
-                🧙
+              <div className="w-16 h-16 rounded-xl bg-fantasy-darkest border-2 border-fantasy-crystal overflow-hidden flex items-center justify-center shadow-inner">
+                {kaelPortrait ? (
+                  <img src={kaelPortrait} alt="Drakon" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-3xl">🐉</span>
+                )}
               </div>
               <div>
-                <div className="text-base font-bold text-slate-100">Kael</div>
-                <div className="text-xs text-fantasy-crystal font-medium">The Lost Wanderer</div>
+                <div className="text-base font-bold text-slate-100 flex items-center gap-1.5">
+                  <span>Drakon</span>
+                  <span className="text-xs text-amber-400 font-normal">(ดราคอน)</span>
+                </div>
+                <div className="text-xs text-fantasy-crystal font-medium">
+                  {lang === 'th' ? 'อัศวินมังกรผ้าคลุมทมิฬ' : 'The Dragonblade Knight'}
+                </div>
                 <div className="text-xs text-slate-400 mt-0.5">
-                  Level {level} • {specialization.replace('_', ' ').toUpperCase()}
+                  Dragonkin • Level {level} • {specialization.replace('_', ' ').toUpperCase()}
                 </div>
                 <div className="text-[11px] text-purple-400 mt-1 font-mono">
                   EXP: {exp} / {nextExp}

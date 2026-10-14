@@ -10,9 +10,12 @@ import {
   Coins, 
   Gem,
   Heart,
-  Zap
+  Zap,
+  Wrench,
+  MapPin
 } from 'lucide-react';
 import { getQuestDefinition } from '../../features/quests/questRegistry';
+import { ALL_SKILLS_36 } from '../../features/skills/skillData';
 
 export const GameHUD: React.FC = () => {
   const { 
@@ -24,10 +27,14 @@ export const GameHUD: React.FC = () => {
     quests, 
     notifications,
     openModal,
-    specialization,
     settings,
     inventory,
     useConsumable,
+    kaelPortrait,
+    hotbar,
+    currentZone,
+    dungeonTier,
+    isSandbox,
   } = useGameStore();
 
   const lang = settings.language;
@@ -54,7 +61,11 @@ export const GameHUD: React.FC = () => {
           {/* Avatar & Level */}
           <div className="relative">
             <div className="w-14 h-14 rounded-lg bg-fantasy-panel border-2 border-fantasy-gold/60 flex items-center justify-center overflow-hidden shadow-inner">
-              <span className="text-2xl font-bold text-fantasy-crystal">✦</span>
+              {kaelPortrait ? (
+                <img src={kaelPortrait} alt="Drakon" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-2xl font-bold text-fantasy-crystal">✦</span>
+              )}
             </div>
             <div className="absolute -bottom-1 -right-1 bg-fantasy-gold text-fantasy-darkest text-xs font-extrabold px-1.5 py-0.5 rounded shadow">
               Lv.{level}
@@ -128,8 +139,22 @@ export const GameHUD: React.FC = () => {
           ))}
         </div>
 
-        {/* Right: Currencies & Menu Bar */}
+        {/* Right: Currencies, Minimap radar & Menu Bar */}
         <div className="flex flex-col items-end gap-2">
+          {/* Location & Minimap Widget */}
+          <div className="pointer-events-auto bg-fantasy-dark/95 backdrop-blur-md border border-fantasy-border rounded-xl px-3 py-1.5 flex items-center gap-2.5 text-xs font-bold shadow-lg">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+            <MapPin size={14} className="text-fantasy-crystal" />
+            <span className="text-slate-100 font-medium">
+              {currentZone === 'village' ? 'Everlight Village' : `Endless Ruins (T${dungeonTier})`}
+            </span>
+            {isSandbox && (
+              <span className="bg-purple-900/80 text-purple-300 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold border border-purple-500/40">
+                SANDBOX
+              </span>
+            )}
+          </div>
+
           {/* Currencies */}
           <div className="pointer-events-auto bg-fantasy-dark/90 backdrop-blur-md border border-fantasy-border rounded-xl px-3 py-1.5 flex items-center gap-4 text-xs font-bold shadow-lg">
             <div className="flex items-center gap-1.5 text-amber-300">
@@ -173,6 +198,13 @@ export const GameHUD: React.FC = () => {
               <BookOpen size={18} />
             </button>
             <button 
+              onClick={() => openModal('sandbox')}
+              className="p-2 hover:bg-purple-900/40 text-purple-300 hover:text-purple-100 rounded-lg transition-colors border border-purple-500/30"
+              title="Sandbox & Cheats Console [F2]"
+            >
+              <Wrench size={18} />
+            </button>
+            <button 
               onClick={() => openModal('settings')}
               className="p-2 hover:bg-fantasy-panel text-slate-300 hover:text-white rounded-lg transition-colors"
               title="Settings [Esc]"
@@ -209,21 +241,64 @@ export const GameHUD: React.FC = () => {
           )}
         </div>
 
-        {/* Center: Action Hotbar */}
-        <div className="pointer-events-auto bg-fantasy-dark/90 backdrop-blur-md border border-fantasy-border px-4 py-2 rounded-2xl flex items-center gap-4 shadow-2xl">
-          <div className="flex items-center gap-1.5 text-xs text-slate-300">
-            <kbd className="bg-fantasy-panel px-2 py-1 rounded border border-fantasy-border font-pixel text-[10px] text-fantasy-gold">J</kbd>
-            <span>{t('pressToAttack', lang).split(':')[1]}</span>
+        {/* Center: 6-Slot Multi-Hotbar */}
+        <div className="pointer-events-auto bg-fantasy-dark/95 backdrop-blur-md border-2 border-fantasy-border/90 px-3.5 py-2 rounded-2xl flex items-center gap-2 shadow-2xl">
+          {/* Base Actions: Slash & Dodge */}
+          <div className="flex items-center gap-2 pr-2.5 border-r border-fantasy-border/60">
+            <div className="flex flex-col items-center">
+              <kbd className="bg-fantasy-panel px-1.5 py-0.5 rounded border border-fantasy-border font-pixel text-[10px] text-fantasy-gold">J</kbd>
+              <span className="text-[9px] text-slate-400">Slash</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <kbd className="bg-fantasy-panel px-1.5 py-0.5 rounded border border-fantasy-border font-pixel text-[10px] text-fantasy-crystal">Space</kbd>
+              <span className="text-[9px] text-slate-400">Dodge</span>
+            </div>
           </div>
-          <div className="w-px h-5 bg-fantasy-border" />
-          <div className="flex items-center gap-1.5 text-xs text-slate-300">
-            <kbd className="bg-fantasy-panel px-2 py-1 rounded border border-fantasy-border font-pixel text-[10px] text-fantasy-crystal">Space</kbd>
-            <span>{t('pressToDodge', lang).split(':')[1]}</span>
-          </div>
-          <div className="w-px h-5 bg-fantasy-border" />
-          <div className="flex items-center gap-1.5 text-xs text-slate-300">
-            <kbd className="bg-fantasy-panel px-2 py-1 rounded border border-fantasy-border font-pixel text-[10px] text-purple-400">K</kbd>
-            <span>{specialization === 'blade_dancer' ? 'Whirlwind' : specialization === 'guardian' ? 'Iron Bastion' : 'Crystal Lance'}</span>
+
+          {/* 6 Hotbar Skill Slots */}
+          <div className="flex items-center gap-1.5">
+            {hotbar.map((skillId, idx) => {
+              const skill = ALL_SKILLS_36[skillId];
+              return (
+                <div key={idx} className="relative group flex flex-col items-center">
+                  <button
+                    onClick={() => {
+                      const game = (window as any).Phaser?.GAMES?.[0];
+                      const scene = game?.scene?.getScene('WorldScene') || game?.scene?.getScene('DungeonScene');
+                      if (scene && (scene as any).performSkillById) {
+                        (scene as any).performSkillById(skillId);
+                      }
+                    }}
+                    className={`w-11 h-11 rounded-xl bg-fantasy-panel hover:bg-slate-800 border-2 flex items-center justify-center transition-all shadow-md active:scale-90 text-lg ${
+                      skill?.isUltimate
+                        ? 'border-amber-400/80 shadow-amber-500/20 shadow-lg'
+                        : 'border-fantasy-border hover:border-fantasy-crystal/70'
+                    }`}
+                    title={
+                      skill 
+                        ? `${lang === 'th' ? skill.nameTh : skill.nameEn} (Hotkey [${idx + 1}])\n${lang === 'th' ? skill.descriptionTh : skill.descriptionEn}` 
+                        : `Slot [${idx + 1}]`
+                    }
+                  >
+                    {skill ? (
+                      skill.tree === 'blade_dancer' ? '🌀' : 
+                      skill.tree === 'guardian' ? '🛡️' : 
+                      skill.tree === 'fire_mage' ? '🔥' : 
+                      skill.tree === 'frost_mage' ? '❄️' : 
+                      skill.tree === 'shadow_assassin' ? '🗡️' : '🔮'
+                    ) : '•'}
+                  </button>
+                  <span className="absolute -top-1.5 -right-1 bg-slate-900 border border-slate-700 text-fantasy-gold font-mono text-[9px] font-bold px-1 rounded-sm shadow">
+                    {idx + 1}
+                  </span>
+                  {skill && (
+                    <span className="text-[9px] text-slate-400 font-mono mt-0.5">
+                      {skill.costMp > 0 ? `${skill.costMp}m` : skill.costSp > 0 ? `${skill.costSp}s` : '0'}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
